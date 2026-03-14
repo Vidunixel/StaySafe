@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -11,7 +11,9 @@ import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
 import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon } from '../../utils/mapIcons';
-import { generateMockHeatmap, generateRandomPoints } from '../../utils/mockData';
+import { generateMockHeatmap } from '../../utils/mockData';
+import { loadCctvLocations } from '../../utils/cctvLocations';
+import { loadStreetLights } from '../../utils/streetLights';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -55,19 +57,14 @@ export default function MapView({
   // Memoize mock data so it doesn't regenerate on every render
   const heatmapData = useMemo(() => generateMockHeatmap(), []);
   
-  const cctvPoints = useMemo(() => {
-    // Generate some clusters around major areas
-    const melbourne = generateRandomPoints([-37.8136, 144.9631], 5, 40);
-    const dandenong = generateRandomPoints([-37.9810, 145.2150], 3, 15);
-    const geelong = generateRandomPoints([-38.1499, 144.3617], 4, 20);
-    return [...melbourne, ...dandenong, ...geelong];
+  const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
+  useEffect(() => {
+    loadCctvLocations().then(setCctvPoints);
   }, []);
 
-  const lightingPoints = useMemo(() => {
-    // Generate more widespread lighting points
-    const melbourneWide = generateRandomPoints([-37.8136, 144.9631], 15, 100);
-    const geelongWide = generateRandomPoints([-38.1499, 144.3617], 8, 30);
-    return [...melbourneWide, ...geelongWide];
+  const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
+  useEffect(() => {
+    loadStreetLights(2000).then(setLightingPoints);
   }, []);
 
   return (
