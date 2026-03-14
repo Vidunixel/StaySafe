@@ -142,11 +142,12 @@ export default function MapView({
         {showHeatmap &&
           !crimeStatsLoading &&
           crimeStats.map((stat) => {
-            const intensity =
-              maxIncidentCount > 0 ? stat.incident_count / maxIncidentCount : 0;
-            const hue = 120 * (1 - intensity);
-            const fillColor = `hsl(${hue}, 70%, 45%)`;
-            const fillOpacity = 0.2 + intensity * 0.6;
+            // Scale 10 (lightest red) -> 170 (dark red); clamp to [0, 1]
+            const heatScale = Math.max(0, Math.min(1, (stat.incident_count - 10) / (170 - 10)));
+            // Red gradient: light red (high L) -> dark red (low L), transparent
+            const lightness = 92 - heatScale * 62; // 92% at 10 incidents -> 30% at 170
+            const fillColor = `hsl(0, 75%, ${lightness}%)`;
+            const fillOpacity = 0.35 + heatScale * 0.25; // 0.35 to 0.6 so map remains visible
             const g = stat.geojson as {
               geometry?: { coordinates?: unknown };
               features?: Array<{ geometry?: { coordinates?: unknown } }>;
@@ -160,7 +161,7 @@ export default function MapView({
                 key={geoKey}
                 data={stat.geojson}
                 style={() => ({
-                  color: "#1e293b",
+                  color: "rgba(139, 0, 0, 0.5)",
                   weight: 1,
                   fillColor,
                   fillOpacity,
