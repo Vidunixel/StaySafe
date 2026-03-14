@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert, Building2 } from 'lucide-react';
 import ToggleCard from '../ToggleCard';
 
 type SidebarReport = {
@@ -18,6 +18,8 @@ type SidebarProps = {
   setShowLighting: React.Dispatch<React.SetStateAction<boolean>>;
   showReports: boolean;
   setShowReports: React.Dispatch<React.SetStateAction<boolean>>;
+  showPoliceStations: boolean;
+  setShowPoliceStations: React.Dispatch<React.SetStateAction<boolean>>;
   reports: SidebarReport[];
 };
 
@@ -30,6 +32,8 @@ export default function Sidebar({
   setShowLighting,
   showReports,
   setShowReports,
+  showPoliceStations,
+  setShowPoliceStations,
   reports,
 }: SidebarProps) {
   return (
@@ -79,6 +83,14 @@ export default function Sidebar({
             title="User Reports"
             description="Incident and safety reports"
             colorClass="text-red-600 bg-red-50 border-red-200"
+          />
+          <ToggleCard
+            active={showPoliceStations}
+            onClick={() => setShowPoliceStations((prev) => !prev)}
+            icon={<Building2 className="w-5 h-5" />}
+            title="Police Stations"
+            description="Victoria Police station locations"
+            colorClass="text-slate-600 bg-slate-50 border-slate-200"
           />
         </div>
 

@@ -11,11 +11,12 @@ import {
 import 'leaflet/dist/leaflet.css';
 import { User } from "lucide-react";
 import * as L from 'leaflet';
-import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
-import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
+import { ShieldAlert, Video, Lightbulb, MapPin, Building2 } from 'lucide-react';
+import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon, policeStationIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
+import { loadPoliceStations } from '../../utils/policeStations';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -43,6 +44,7 @@ type MapViewProps = {
   showCCTV: boolean;
   showLighting: boolean;
   showReports: boolean;
+  showPoliceStations: boolean;
   reports: Array<{id: string, lat: number, lng: number, type: string, description: string, date: string}>;
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: {lat: number, lng: number} | null;
@@ -53,6 +55,7 @@ export default function MapView({
   showCCTV, 
   showLighting, 
   showReports,
+  showPoliceStations,
   reports,
   onMapClick,
   draftLocation
@@ -86,6 +89,11 @@ export default function MapView({
   const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
   useEffect(() => {
     loadStreetLights(2000).then(setLightingPoints);
+  }, []);
+
+  const [policeStationPoints, setPoliceStationPoints] = useState<[number, number][]>([]);
+  useEffect(() => {
+    loadPoliceStations().then(setPoliceStationPoints);
   }, []);
 
   function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
@@ -176,6 +184,22 @@ export default function MapView({
           </Marker>
         ))}
 
+        {/* Police Stations Layer */}
+        {showPoliceStations && policeStationPoints.map((point, idx) => (
+          <Marker 
+            key={`police-${idx}`} 
+            position={point} 
+            icon={policeStationIcon}
+          >
+            <Popup>
+              <div className="font-sans text-xs">
+                <span className="font-semibold text-slate-700 block mb-1">Police Station</span>
+                <span className="text-slate-500">Victoria Police facility.</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
         {/* User Reports Layer */}
         {showReports && reports.map((report) => (
           <Marker 
@@ -243,6 +267,14 @@ export default function MapView({
                 <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
               </div>
               <span className="text-slate-600">Street Lighting</span>
+            </div>
+          )}
+          {showPoliceStations && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <Building2 className="w-2.5 h-2.5 text-slate-700" />
+              </div>
+              <span className="text-slate-600">Police Station</span>
             </div>
           )}
           {showReports && (

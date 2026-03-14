@@ -19,10 +19,12 @@ export default function App() {
     showCCTV,
     showLighting,
     showReports,
+    showPoliceStations,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
     setShowReports,
+    setShowPoliceStations,
     reports,
     reportingLocation,
     handleMapClick,
@@ -41,6 +43,8 @@ export default function App() {
         setShowLighting={setShowLighting}
         showReports={showReports}
         setShowReports={setShowReports}
+        showPoliceStations={showPoliceStations}
+        setShowPoliceStations={setShowPoliceStations}
         reports={reports}
       />
 
@@ -50,6 +54,7 @@ export default function App() {
           showCCTV={showCCTV}
           showLighting={showLighting}
           showReports={showReports}
+          showPoliceStations={showPoliceStations}
           reports={reports}
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
