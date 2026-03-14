@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   Building2,
   Route,
+  ArrowUpRight,
 } from "lucide-react";
 import ToggleCard from "../ToggleCard";
 import type { Report } from "../../App";
@@ -58,15 +59,15 @@ export default function Sidebar({
 
   return (
     <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-lg relative">
-      <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+      <div className="p-6 border-b border-slate-100 bg-slate-900 text-white flex items-center gap-3 shadow-xl">
         <div className="bg-blue-600 p-2 rounded-lg">
           <Shield className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold tracking-tight">
             StaySafe
           </h1>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs text-slate-300 font-medium">
             Victoria Crime Prediction
           </p>
         </div>
@@ -74,25 +75,25 @@ export default function Sidebar({
 
       <div className="p-6 flex-1 overflow-y-auto">
         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
-          Map Layers
-        </h2>
+          Safety
+        </h2>   
 
         <div className="space-y-3">
           <ToggleCard
             active={showHeatmap}
             onClick={() => setShowHeatmap((prev) => !prev)}
             icon={<MapIcon className="w-5 h-5" />}
-            title="Crime Map"
+            title="Crime Risk"
             description="Predicted crime risk "
-            colorClass="text-violet-600 bg-violet-50 border-violet-200"
+            colorClass="text-red-700 bg-red-100 border-red-300"
           />
           <ToggleCard
-            active={showCCTV}
-            onClick={() => setShowCCTV((prev) => !prev)}
-            icon={<Video className="w-5 h-5" />}
-            title="CCTV Cameras"
-            description="Surveillance areas"
-            colorClass="text-blue-600 bg-blue-50 border-blue-200"
+            active={showReports}
+            onClick={() => setShowReports((prev) => !prev)}
+            icon={<ShieldAlert className="w-5 h-5" />}
+            title="User Reports"
+            description="Incident reports"
+            colorClass="text-red-500 bg-red-50 border-red-200"
           />
           <ToggleCard
             active={showLighting}
@@ -102,13 +103,20 @@ export default function Sidebar({
             description="Well-lit areas"
             colorClass="text-amber-500 bg-amber-50 border-amber-200"
           />
+        </div>
+
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4">
+          Services
+        </h2>
+
+        <div className="space-y-3">
           <ToggleCard
-            active={showReports}
-            onClick={() => setShowReports((prev) => !prev)}
-            icon={<ShieldAlert className="w-5 h-5" />}
-            title="User Reports"
-            description="Incident reports"
-            colorClass="text-red-600 bg-red-50 border-red-200"
+            active={showCCTV}
+            onClick={() => setShowCCTV((prev) => !prev)}
+            icon={<Video className="w-5 h-5" />}
+            title="CCTV Cameras"
+            description="Surveillance areas"
+            colorClass="text-blue-600 bg-blue-50 border-blue-200"
           />
           <ToggleCard
             active={showPoliceStations}
@@ -118,6 +126,14 @@ export default function Sidebar({
             description="Police locations"
             colorClass="text-indigo-600 bg-indigo-50 border-indigo-200"
           />
+
+        </div>
+          
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4">
+          Navigation
+        </h2>
+
+        <div className="space-y-3">
           <ToggleCard
             active={showPedestrianNetwork}
             onClick={() => setShowPedestrianNetwork((prev) => !prev)}
@@ -126,18 +142,26 @@ export default function Sidebar({
             description="Walking paths"
             colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
           />
-          <ToggleCard
-            active={showNavigation}
-            onClick={() => setShowNavigation((prev) => !prev)}
-            icon={<Route className="w-5 h-5" />}
-            title="Safe Navigation"
-            description="Set destination"
-            colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
-          />
+
+        <button
+          onClick={() => setShowNavigation((prev) => !prev)}
+          className={`flex items-center gap-3 p-4 w-full max-w-xs rounded-xl shadow-md 
+            ${showNavigation ? "bg-green-900 text-white border-green-900" 
+                            : "bg-green-700 text-white border-green-700"} 
+            hover:bg-green-800 transition-all duration-200`}
+        >
+          <div className="p-2 rounded-lg bg-green-900 text-white">
+            <ArrowUpRight className="w-5 h-5" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-semibold text-lg">Safe Navigation</h3>
+          </div>
+        </button>
+
         </div>
 
         {showNavigation && (
-          <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+          <div className="mt-4 bg-slate-200 border border-slate-100 rounded-xl p-4 text-sm text-slate-900">
             <p className="font-medium">Navigation is active.</p>
             <p className="text-xs mt-1">
               Click on the map to set a destination and view the safest route
@@ -146,7 +170,7 @@ export default function Sidebar({
             {destination && (
               <button
                 onClick={clearNavigationDestination}
-                className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition-colors"
+                className="mt-3 w-full bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition-colors"
               >
                 Clear Destination
               </button>
@@ -174,7 +198,7 @@ export default function Sidebar({
         {recentReports.length > 0 && (
           <div className="mt-8">
             <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
-              Recent Reports (24h)
+              Recent Reports (Last 24h)
             </h2>
             <div className="space-y-3">
               {recentReports
