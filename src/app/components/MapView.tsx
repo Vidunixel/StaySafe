@@ -6,6 +6,7 @@ import {
   Popup,
   Polyline,
   Polygon,
+  GeoJSON,
   useMapEvents,
   useMap,
   ZoomControl,
@@ -34,6 +35,7 @@ import { loadStreetLights } from "../../utils/streetLights";
 import { loadPoliceStations } from "../../utils/policeStations";
 import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
 import type { Report } from "../App";
+import type { GeoJsonObject } from "geojson";
 import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 
 type LatLngTuple = [number, number];
@@ -122,7 +124,7 @@ export default function MapView({
 
         if (!initialLoadDone && mapRef.current) {
           mapRef.current.setView([location.lat, location.lng], 11);
-          setInitialLoadDone(true);
+          setInitialLoadDone(true);  
         }
       },
       () => {
@@ -662,9 +664,9 @@ export default function MapView({
         onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
         className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
         >
-          {recenterIcon}
+          {recenterIcon} 
       </div>
-
+  
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
@@ -713,72 +715,28 @@ export default function MapView({
         </form>
       )}
 
-      <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
-        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-
-        </h4>
-        <div className="space-y-2 text-sm">
-          {showHeatmap && (
+      {showHeatmap && (
+        <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+          Risk Indicator 
+          </h4>
+          <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-violet-500 opacity-60"></div>
               <span className="text-slate-600">High Risk Area</span>
             </div>
-          )}
-          {showHeatmap && (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-fuchsia-500 opacity-60"></div>
               <span className="text-slate-600">Medium Risk Area</span>
             </div>
-          )}
-          {showHeatmap && (
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-cyan-500 opacity-60"></div>
               <span className="text-slate-600">Low Risk Area</span>
             </div>
-          )}
-          {showCCTV && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200 flex items-center justify-center">
-                <Video className="w-2.5 h-2.5 text-blue-700" />
-              </div>
-              <span className="text-slate-600">CCTV Camera</span>
-            </div>
-          )}
-          {showLighting && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200 flex items-center justify-center">
-                <Lightbulb className="w-2.5 h-2.5 text-amber-600" />
-              </div>
-              <span className="text-slate-600">Street Lighting</span>
-            </div>
-          )}
-          {showReports && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-red-100 border border-red-200 flex items-center justify-center">
-                <ShieldAlert className="w-2.5 h-2.5 text-red-700" />
-              </div>
-              <span className="text-slate-600">User Report</span>
-            </div>
-          )}
-          {showPoliceStations && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-indigo-100 border border-indigo-200 flex items-center justify-center">
-                <Building2 className="w-2.5 h-2.5 text-indigo-700" />
-              </div>
-              <span className="text-slate-600">Police Station</span>
-            </div>
-          )}
-          {showPedestrianNetwork && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200 flex items-center justify-center">
-                <Route className="w-2.5 h-2.5 text-emerald-700" />
-              </div>
-              <span className="text-slate-600">Pedestrian Network</span>
-            </div>
-          )}
+          </div>  
         </div>
-      </div>
-
+      )}
+      
       {showNavigation && navigationSummary && (
         <div className="absolute top-6 right-6 z-[450] bg-white p-4 rounded-xl shadow-lg border border-emerald-100 min-w-[220px]">
           <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
