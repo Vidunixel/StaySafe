@@ -1,21 +1,21 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
-  Circle,
   Marker,
   Popup,
   useMapEvents,
   useMap,
+  GeoJSON,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { User } from "lucide-react";
 import * as L from 'leaflet';
-import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
+import { ShieldAlert, Video, Lightbulb } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
-import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
+import { useCrimeStats } from '../../hooks/useCrimeStats';
+import type { Report } from '../App';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -43,7 +43,7 @@ type MapViewProps = {
   showCCTV: boolean;
   showLighting: boolean;
   showReports: boolean;
-  reports: Array<{id: string, lat: number, lng: number, type: string, description: string, date: string}>;
+  reports: Report[];
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: {lat: number, lng: number} | null;
 };
@@ -57,10 +57,8 @@ export default function MapView({
   onMapClick,
   draftLocation
 }: MapViewProps) {
-  
-  // Memoize mock data so it doesn't regenerate on every render
-  const heatmapData = useMemo(() => generateMockHeatmap(), []);
-  
+  const { data: crimeStats, isLoading: crimeStatsLoading, maxIncidentCount } = useCrimeStats();
+
   // Set user location as center on initial load
   const [mapCenter, setMapCenter] = useState<{lat: number, lng: number} | null>(null);
 
@@ -122,27 +120,44 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} />
 
-        {/* Heatmap Layer (Simulated with Circles) */}
-        {showHeatmap && heatmapData.map((region, idx) => (
-          <Circle
-            key={`heat-${idx}`}
-            center={region.center as [number, number]}
-            pathOptions={{ 
-              color: region.color, 
-              fillColor: region.fillColor, 
-              fillOpacity: region.intensity,
-              weight: 1
-            }}
-            radius={region.radius}
-          >
-            <Popup>
-              <div className="font-sans">
-                <h3 className="font-bold text-sm text-slate-800">{region.name}</h3>
-                <p className="text-xs text-slate-500 mt-1 capitalize">Predicted Risk: <span className="font-semibold text-slate-700">{region.risk}</span></p>
-              </div>
-            </Popup>
-          </Circle>
-        ))}
+        {/* Crime stats heatmap (GeoJSON polygons by LGA) */}
+        {showHeatmap &&
+          !crimeStatsLoading &&
+          crimeStats.map((stat) => {
+            const intensity =
+              maxIncidentCount > 0 ? stat.incident_count / maxIncidentCount : 0;
+            const hue = 120 * (1 - intensity);
+            const fillColor = `hsl(${hue}, 70%, 45%)`;
+            const fillOpacity = 0.2 + intensity * 0.6;
+            const g = stat.geojson as {
+              geometry?: { coordinates?: unknown };
+              features?: Array<{ geometry?: { coordinates?: unknown } }>;
+            };
+            const coords =
+              g.geometry?.coordinates ?? g.features?.[0]?.geometry?.coordinates ?? '';
+            const geoKey = `${stat.id}-${JSON.stringify(coords)}`;
+
+            return (
+              <GeoJSON
+                key={geoKey}
+                data={stat.geojson}
+                style={() => ({
+                  color: '#1e293b',
+                  weight: 1,
+                  fillColor,
+                  fillOpacity,
+                })}
+                onEachFeature={(_feature, layer) => {
+                  layer.bindPopup(
+                    `<div class="font-sans min-w-[140px]">
+                      <h3 class="font-bold text-sm text-slate-800">${stat.local_gov_area}</h3>
+                      <p class="text-xs text-slate-500 mt-1">Incident count: <span class="font-semibold text-slate-700">${stat.incident_count}</span></p>
+                    </div>`
+                  );
+                }}
+              />
+            );
+          })}
 
         {/* CCTV Layer */}
         {showCCTV && cctvPoints.map((point, idx) => (
@@ -176,27 +191,34 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* User Reports Layer */}
-        {showReports && reports.map((report) => (
-          <Marker 
-            key={report.id} 
-            position={[report.lat, report.lng]} 
-            icon={reportIcon}
-          >
-            <Popup>
-              <div className="font-sans min-w-[200px]">
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
-                  <ShieldAlert className="w-4 h-4 text-red-600" />
-                  <h3 className="font-bold text-sm text-slate-900">{report.type}</h3>
+        {/* User Reports Layer - geo_coordinates is [lat, lng] (array of floats) */}
+        {showReports && reports.map((report) => {
+          const coords = report.geo_coordinates;
+          if (!Array.isArray(coords) || coords.length < 2) return null;
+          const lat = Number(coords[0]);
+          const lng = Number(coords[1]);
+          if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+          return (
+            <Marker
+              key={report.id}
+              position={[lat, lng]}
+              icon={reportIcon}
+            >
+              <Popup>
+                <div className="font-sans min-w-[200px]">
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                    <ShieldAlert className="w-4 h-4 text-red-600" />
+                    <h3 className="font-bold text-sm text-slate-900">{report.incident_type}</h3>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-2">{report.description}</p>
+                  <p className="text-xs text-slate-400">
+                    Reported: {new Date(report.created_at).toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-600 mb-2">{report.description}</p>
-                <p className="text-xs text-slate-400">
-                  Reported: {new Date(report.date).toLocaleString()}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Draft Location Marker */}
         {draftLocation && (
