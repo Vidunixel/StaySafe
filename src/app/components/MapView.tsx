@@ -5,7 +5,7 @@ import {
   Marker,
   Popup,
   Polyline,
-  GeoJSON,
+  Polygon,
   useMapEvents,
   useMap,
   ZoomControl,
@@ -34,7 +34,7 @@ import { loadStreetLights } from "../../utils/streetLights";
 import { loadPoliceStations } from "../../utils/policeStations";
 import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
 import type { Report } from "../App";
-import type { GeoJsonObject } from "geojson";
+import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 
 type LatLngTuple = [number, number];
 
@@ -105,7 +105,7 @@ export default function MapView({
   destination,
   setDestination,
 }: MapViewProps) {
-  const { data: crimeStats, isLoading: crimeStatsLoading, maxIncidentCount } = useCrimeStats();
+  const { data: crimeStats, isLoading: crimeStatsLoading, maxAvgRate } = useCrimeStats();
   const hasRecenteredRef = useRef(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -122,7 +122,7 @@ export default function MapView({
 
         if (!initialLoadDone && mapRef.current) {
           mapRef.current.setView([location.lat, location.lng], 11);
-          setInitialLoadDone(true);  
+          setInitialLoadDone(true);
         }
       },
       () => {
@@ -494,46 +494,47 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} />
 
-        {/* Crime stats heatmap: Supabase crime_stats + geo-coding polygons; 10 = lightest red, 180 = darkest, transparent */}
+        {/* Crime stats heatmap: Supabase crime_stats geo_bounds polygons; 10 = lightest red, 180 = darkest, transparent */}
         {showHeatmap &&
           !crimeStatsLoading &&
           crimeStats.map((stat) => {
             const heatScale = Math.max(
               0,
-              Math.min(1, (stat.incident_count - 10) / (180 - 10)),
+              Math.min(1, (stat.avg_rate_per_100k - 10) / (180 - 10)),
             );
             const lightness = 92 - heatScale * 62;
             const fillColor = `hsl(0, 75%, ${lightness}%)`;
             const fillOpacity = 0.35 + heatScale * 0.25;
-            const g = stat.geojson as {
-              geometry?: { coordinates?: unknown };
-              features?: Array<{ geometry?: { coordinates?: unknown } }>;
-            };
-            const coords =
-              g?.geometry?.coordinates ??
-              g?.features?.[0]?.geometry?.coordinates ??
-              "";
-            const geoKey = `${stat.id}-${JSON.stringify(coords)}`;
+            const positions = geoBoundsToLatLngs(
+              (stat as { geo_bounds?: unknown }).geo_bounds,
+            );
+            if (!positions) return null;
 
             return (
-              <GeoJSON
-                key={geoKey}
-                data={stat.geojson as GeoJsonObject}
-                style={() => ({
+              <Polygon
+                key={stat.id}
+                positions={positions as any}
+                pathOptions={{
                   color: "rgba(139, 0, 0, 0.5)",
                   weight: 1,
                   fillColor,
                   fillOpacity,
-                })}
-                onEachFeature={(_feature, layer) => {
-                  layer.bindPopup(
-                    `<div class="font-sans min-w-[140px]">
-                      <h3 class="font-bold text-sm text-slate-800">${stat.local_gov_area}</h3>
-                      <p class="text-xs text-slate-500 mt-1">Incident count: <span class="font-semibold text-slate-700">${stat.incident_count}</span></p>
-                    </div>`,
-                  );
                 }}
-              />
+              >
+                <Popup>
+                  <div className="font-sans min-w-[140px]">
+                    <h3 className="font-bold text-sm text-slate-800">
+                      {stat.local_gov_area}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Avg rate per 100k:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {stat.avg_rate_per_100k.toFixed(1)}
+                      </span>
+                    </p>
+                  </div>
+                </Popup>
+              </Polygon>
             );
           })}
 
@@ -661,9 +662,9 @@ export default function MapView({
         onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
         className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
         >
-          {recenterIcon} 
+          {recenterIcon}
       </div>
-  
+
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
@@ -714,7 +715,7 @@ export default function MapView({
 
       <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          
+
         </h4>
         <div className="space-y-2 text-sm">
           {showHeatmap && (

@@ -1,42 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 
-const GEO_CODING_URL =
-  "https://lvnnqtsvjqcgrimjgrad.supabase.co/functions/v1/geo-coding";
-
 type CrimeStatRow = {
   id: string;
   local_gov_area: string;
-  incident_count: number;
+  avg_rate_per_100k: number;
+  geo_bounds?: unknown; // jsonb: multi-dimensional array of coordinates
   [key: string]: unknown;
 };
 
-/** Geo-coding API response: contains geojson (Feature with Polygon) */
-type GeoCodingResponse = {
-  address_query?: string;
-  formatted_address?: string;
-  place_id?: string;
-  center?: { lat: number; lng: number };
-  geojson?: GeoJSONResponse;
-  [key: string]: unknown;
-};
-
-/** Minimal type for GeoJSON returned by the edge function (Feature with Polygon) */
-export type GeoJSONResponse = Record<string, unknown> & {
-  type?: string;
-  geometry?: unknown;
-  features?: unknown[];
-};
-
-export type CrimeStatWithGeo = {
+export type CrimeStatWithBounds = {
   id: string;
   local_gov_area: string;
-  incident_count: number;
-  geojson: GeoJSONResponse;
+  avg_rate_per_100k: number;
+  geo_bounds: unknown;
 };
 
 export function useCrimeStats() {
-  const [data, setData] = useState<CrimeStatWithGeo[]>([]);
+  const [data, setData] = useState<CrimeStatWithBounds[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -48,49 +29,21 @@ export function useCrimeStats() {
       try {
         const { data: rows, error: fetchError } = await supabase
           .from("crime_stats")
-          .select("*");
+          .select("id, local_gov_area, avg_rate_per_100k, geo_bounds");
 
         if (fetchError) {
           throw fetchError;
         }
 
         const stats = (rows ?? []) as CrimeStatRow[];
-        const anonKey =
-          (import.meta as unknown as { env?: Record<string, string> }).env
-            ?.VITE_SUPABASE_ANON_KEY ?? "";
-
-        const combined = await Promise.all(
-          stats.map(async (stat) => {
-            const url = `${GEO_CODING_URL}?address=${encodeURIComponent(stat.local_gov_area)}`;
-            const res = await fetch(url, {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${anonKey}`,
-              },
-            });
-
-            if (!res.ok) {
-              throw new Error(
-                `Geo-coding failed for ${stat.local_gov_area}: ${res.status} ${res.statusText}`
-              );
-            }
-
-            const body = (await res.json()) as GeoCodingResponse;
-            const geojson =
-              body?.geojson != null && typeof body.geojson === "object"
-                ? (body.geojson as GeoJSONResponse)
-                : ({} as GeoJSONResponse);
-
-            return {
-              id: stat.id,
-              local_gov_area: stat.local_gov_area,
-              incident_count: stat.incident_count,
-              geojson,
-            } satisfies CrimeStatWithGeo;
-          })
+        setData(
+          stats.map((stat) => ({
+            id: stat.id,
+            local_gov_area: stat.local_gov_area,
+            avg_rate_per_100k: stat.avg_rate_per_100k,
+            geo_bounds: stat.geo_bounds ?? null,
+          })),
         );
-
-        setData(combined);
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)));
         setData([]);
@@ -102,15 +55,15 @@ export function useCrimeStats() {
     fetchStats();
   }, []);
 
-  const maxIncidentCount = useMemo(() => {
+  const maxAvgRate = useMemo(() => {
     if (data.length === 0) return 0;
-    return Math.max(...data.map((d) => d.incident_count));
+    return Math.max(...data.map((d) => d.avg_rate_per_100k));
   }, [data]);
 
   return {
     data,
     isLoading,
     error,
-    maxIncidentCount,
+    maxAvgRate,
   };
 }
