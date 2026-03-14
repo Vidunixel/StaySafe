@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -7,12 +7,12 @@ import {
   Popup,
   useMapEvents,
   useMap,
+  ZoomControl,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { User } from "lucide-react";
 import * as L from 'leaflet';
-import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
-import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
+import { ShieldAlert, Video, Lightbulb } from 'lucide-react';
+import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon, recenterIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
@@ -58,26 +58,41 @@ export default function MapView({
   draftLocation
 }: MapViewProps) {
   
-  // Memoize mock data so it doesn't regenerate on every render
+  // Memorize mock data so it doesn't regenerate on every render
   const heatmapData = useMemo(() => generateMockHeatmap(), []);
   
-  // Set user location as center on initial load
-  const [mapCenter, setMapCenter] = useState<{lat: number, lng: number} | null>(null);
+  // Set user location as center on initial load only
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
 
   // Get user location on mount
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setMapCenter({
+        const location = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-        });
+        };
+        setUserLocation(location);
+
+        // Only set user location as map center on initial load
+        if (!initialLoadDone && mapRef.current) {
+          mapRef.current.setView([location.lat, location.lng], 11);
+          setInitialLoadDone(true);  
+        }
       },
-      () => setMapCenter({ lat: -37.8136, lng: 144.9631 }) // fallback: Melbourne
+      (error) => {
+        const fallback = { lat: -37.8136, lng: 144.9631 };
+        setUserLocation(fallback);
+        if (mapRef.current && !initialLoadDone) {
+          mapRef.current.setView([fallback.lat, fallback.lng], 11);
+          setInitialLoadDone(true);
+        }
+      }
     );
   }, []);
-
-  
+    
   const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
   useEffect(() => {
     loadCctvLocations().then(setCctvPoints);
@@ -88,38 +103,29 @@ export default function MapView({
     loadStreetLights(2000).then(setLightingPoints);
   }, []);
 
-  function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
-    const map = useMap();
-
-    useEffect(() => {
-      if (center) {
-        console.log("Recentering map to:", center);
-        map.setView(center, 15); // zoom 15
-      }
-    }, [center]);
-
-    return null;
-  }
-
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer 
-        center={mapCenter || { lat: -37.8136, lng: 144.9631 }} // fallback to Melb Center if not loaded yet
+        center={[ -37.8136, 144.9631 ]} // fallback to Melb Center if not loaded yet
         zoom={11}
         style={{ height: '100%', width: '100%' }}
+        ref={mapRef}
+        zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
+
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
         
         {/* Recenter dynamically when user location is ready */}
-        {mapCenter && (
+        {userLocation && (
           <>
-            <Marker position={mapCenter} icon={userIcon} />
-            <RecenterMap center={mapCenter} />
+            <Marker position={userLocation} icon={userIcon} />
           </>
         )}
+
         <MapEventHandler onMapClick={onMapClick} />
 
         {/* Heatmap Layer (Simulated with Circles) */}
@@ -205,10 +211,19 @@ export default function MapView({
             icon={draftIcon}
           />
         )}
+        
       </MapContainer>
       
+      {/* Floating Recenter Button */}
+      <div
+        onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
+        className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
+        >
+          {recenterIcon} 
+      </div>
+  
       {/* Custom Map Overlay UI for legends/controls if needed */}
-      <div className="absolute bottom-6 right-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
+      <div className="absolute top-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Legend</h4>
         <div className="space-y-2 text-sm">
           {showHeatmap && (

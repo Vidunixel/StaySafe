@@ -1,6 +1,7 @@
 import * as L from 'leaflet';
 import { renderToString } from 'react-dom/server';
 import { User } from "lucide-react";
+import { Crosshair } from "lucide-react";
 
 // Raw SVG strings for custom map icons
 const cctvSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-video"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>`;
@@ -44,4 +45,8 @@ export const draftIcon = createLeafletIcon(
 
 export const userIcon = createLeafletIcon(
   createCustomIconHtml(humanSvg, 'text-white', 'bg-blue-500'),
+);
+
+export const recenterIcon = (
+    <Crosshair className="w-6 h-6 text-blue-500" />
 );
