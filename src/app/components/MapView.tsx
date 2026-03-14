@@ -6,12 +6,17 @@ import {
   Marker,
   Popup,
   useMapEvents,
+  useMap,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { User } from "lucide-react";
 import * as L from 'leaflet';
 import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
-import { cctvIcon, lightingIcon, reportIcon, draftIcon } from '../../utils/mapIcons';
+import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap, generateRandomPoints } from '../../utils/mockData';
+import { useEffect, useState } from "react";
+
+
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -54,7 +59,23 @@ export default function MapView({
   
   // Memoize mock data so it doesn't regenerate on every render
   const heatmapData = useMemo(() => generateMockHeatmap(), []);
-  
+
+  // Set user location as center on initial load
+  const [mapCenter, setMapCenter] = useState<{lat: number, lng: number} | null>(null);
+
+  // Get user location on mount
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setMapCenter({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      () => setMapCenter({ lat: -37.8136, lng: 144.9631 }) // fallback: Melbourne
+    );
+  }, []);
+
   const cctvPoints = useMemo(() => {
     // Generate some clusters around major areas
     const melbourne = generateRandomPoints([-37.8136, 144.9631], 5, 40);
@@ -70,11 +91,24 @@ export default function MapView({
     return [...melbourneWide, ...geelongWide];
   }, []);
 
+  function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
+    const map = useMap();
+
+    useEffect(() => {
+      if (center) {
+        console.log("Recentering map to:", center);
+        map.setView(center, 15); // zoom 15
+      }
+    }, [center]);
+
+    return null;
+  }
+
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer 
-        center={[-37.8136, 144.9631]} // Center on Melbourne initially
-        zoom={11} 
+        center={mapCenter || { lat: -37.8136, lng: 144.9631 }} // fallback to Melb Center if not loaded yet
+        zoom={11}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
@@ -82,6 +116,13 @@ export default function MapView({
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
         
+        {/* Recenter dynamically when user location is ready */}
+        {mapCenter && (
+          <>
+            <Marker position={mapCenter} icon={userIcon} />
+            <RecenterMap center={mapCenter} />
+          </>
+        )}
         <MapEventHandler onMapClick={onMapClick} />
 
         {/* Heatmap Layer (Simulated with Circles) */}
