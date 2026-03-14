@@ -1,11 +1,11 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
-  Circle,
   Marker,
   Popup,
   Polyline,
+  GeoJSON,
   useMapEvents,
   useMap,
 } from 'react-leaflet';
@@ -14,8 +14,8 @@ import { User } from "lucide-react";
 import * as L from 'leaflet';
 import { ShieldAlert, Video, Lightbulb, MapPin, Building2, Route } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon, policeStationIcon } from '../../utils/mapIcons';
-import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
+import { useCrimeStats } from '../../hooks/useCrimeStats';
 import { loadStreetLights } from '../../utils/streetLights';
 import { loadPoliceStations } from '../../utils/policeStations';
 import { loadPedestrianNetwork } from '../../utils/pedestrianNetwork';
@@ -65,10 +65,8 @@ export default function MapView({
   onMapClick,
   draftLocation
 }: MapViewProps) {
-  
-  // Memoize mock data so it doesn't regenerate on every render
-  const heatmapData = useMemo(() => generateMockHeatmap(), []);
-  
+  const { data: crimeStats, isLoading: crimeStatsLoading, maxIncidentCount } = useCrimeStats();
+
   // Set user location as center on initial load
   const [mapCenter, setMapCenter] = useState<{lat: number, lng: number} | null>(null);
 
@@ -140,27 +138,44 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} />
 
-        {/* Heatmap Layer (Simulated with Circles) */}
-        {showHeatmap && heatmapData.map((region, idx) => (
-          <Circle
-            key={`heat-${idx}`}
-            center={region.center as [number, number]}
-            pathOptions={{ 
-              color: region.color, 
-              fillColor: region.fillColor, 
-              fillOpacity: region.intensity,
-              weight: 1
-            }}
-            radius={region.radius}
-          >
-            <Popup>
-              <div className="font-sans">
-                <h3 className="font-bold text-sm text-slate-800">{region.name}</h3>
-                <p className="text-xs text-slate-500 mt-1 capitalize">Predicted Risk: <span className="font-semibold text-slate-700">{region.risk}</span></p>
-              </div>
-            </Popup>
-          </Circle>
-        ))}
+        {/* Crime stats heatmap (GeoJSON polygons by LGA from Supabase + geo-coding) */}
+        {showHeatmap &&
+          !crimeStatsLoading &&
+          crimeStats.map((stat) => {
+            const intensity =
+              maxIncidentCount > 0 ? stat.incident_count / maxIncidentCount : 0;
+            const hue = 120 * (1 - intensity);
+            const fillColor = `hsl(${hue}, 70%, 45%)`;
+            const fillOpacity = 0.2 + intensity * 0.6;
+            const g = stat.geojson as {
+              geometry?: { coordinates?: unknown };
+              features?: Array<{ geometry?: { coordinates?: unknown } }>;
+            };
+            const coords =
+              g?.geometry?.coordinates ?? g?.features?.[0]?.geometry?.coordinates ?? "";
+            const geoKey = `${stat.id}-${JSON.stringify(coords)}`;
+
+            return (
+              <GeoJSON
+                key={geoKey}
+                data={stat.geojson}
+                style={() => ({
+                  color: "#1e293b",
+                  weight: 1,
+                  fillColor,
+                  fillOpacity,
+                })}
+                onEachFeature={(_feature, layer) => {
+                  layer.bindPopup(
+                    `<div class="font-sans min-w-[140px]">
+                      <h3 class="font-bold text-sm text-slate-800">${stat.local_gov_area}</h3>
+                      <p class="text-xs text-slate-500 mt-1">Incident count: <span class="font-semibold text-slate-700">${stat.incident_count}</span></p>
+                    </div>`
+                  );
+                }}
+              />
+            );
+          })}
 
         {/* CCTV Layer */}
         {showCCTV && cctvPoints.map((point, idx) => (
