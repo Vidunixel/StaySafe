@@ -5,17 +5,21 @@ import {
   Circle,
   Marker,
   Popup,
+  Polyline,
   useMapEvents,
   useMap,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { User } from "lucide-react";
 import * as L from 'leaflet';
-import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
-import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
+import { ShieldAlert, Video, Lightbulb, MapPin, Building2, Route } from 'lucide-react';
+import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon, policeStationIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
+import { loadPoliceStations } from '../../utils/policeStations';
+import { loadPedestrianNetwork } from '../../utils/pedestrianNetwork';
+import type { Report } from '../App';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -43,7 +47,9 @@ type MapViewProps = {
   showCCTV: boolean;
   showLighting: boolean;
   showReports: boolean;
-  reports: Array<{id: string, lat: number, lng: number, type: string, description: string, date: string}>;
+  showPoliceStations: boolean;
+  showPedestrianNetwork: boolean;
+  reports: Report[];
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: {lat: number, lng: number} | null;
 };
@@ -53,6 +59,8 @@ export default function MapView({
   showCCTV, 
   showLighting, 
   showReports,
+  showPoliceStations,
+  showPedestrianNetwork,
   reports,
   onMapClick,
   draftLocation
@@ -86,6 +94,16 @@ export default function MapView({
   const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
   useEffect(() => {
     loadStreetLights(2000).then(setLightingPoints);
+  }, []);
+
+  const [policeStations, setPoliceStations] = useState<Array<{ position: [number, number]; name: string }>>([]);
+  useEffect(() => {
+    loadPoliceStations().then(setPoliceStations);
+  }, []);
+
+  const [pedestrianSegments, setPedestrianSegments] = useState<[number, number][][]>([]);
+  useEffect(() => {
+    loadPedestrianNetwork(3000).then(setPedestrianSegments);
   }, []);
 
   function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
@@ -176,27 +194,34 @@ export default function MapView({
           </Marker>
         ))}
 
-        {/* User Reports Layer */}
-        {showReports && reports.map((report) => (
-          <Marker 
-            key={report.id} 
-            position={[report.lat, report.lng]} 
-            icon={reportIcon}
-          >
-            <Popup>
-              <div className="font-sans min-w-[200px]">
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
-                  <ShieldAlert className="w-4 h-4 text-red-600" />
-                  <h3 className="font-bold text-sm text-slate-900">{report.type}</h3>
+        {/* User Reports Layer - geo_coordinates is [lat, lng] (array of floats) */}
+        {showReports && reports.map((report) => {
+          const coords = report.geo_coordinates;
+          if (!Array.isArray(coords) || coords.length < 2) return null;
+          const lat = Number(coords[0]);
+          const lng = Number(coords[1]);
+          if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+          return (
+            <Marker
+              key={report.id}
+              position={[lat, lng]}
+              icon={reportIcon}
+            >
+              <Popup>
+                <div className="font-sans min-w-[200px]">
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                    <ShieldAlert className="w-4 h-4 text-red-600" />
+                    <h3 className="font-bold text-sm text-slate-900">{report.incident_type}</h3>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-2">{report.description}</p>
+                  <p className="text-xs text-slate-400">
+                    Reported: {new Date(report.created_at).toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-sm text-slate-600 mb-2">{report.description}</p>
-                <p className="text-xs text-slate-400">
-                  Reported: {new Date(report.date).toLocaleString()}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Draft Location Marker */}
         {draftLocation && (
@@ -251,6 +276,22 @@ export default function MapView({
                 <ShieldAlert className="w-2.5 h-2.5 text-red-700" />
               </div>
               <span className="text-slate-600">User Report</span>
+            </div>
+          )}
+          {showPoliceStations && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-indigo-100 border border-indigo-200 flex items-center justify-center">
+                <Building2 className="w-2.5 h-2.5 text-indigo-700" />
+              </div>
+              <span className="text-slate-600">Police Station</span>
+            </div>
+          )}
+          {showPedestrianNetwork && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                <Route className="w-2.5 h-2.5 text-emerald-700" />
+              </div>
+              <span className="text-slate-600">Pedestrian Network</span>
             </div>
           )}
         </div>
