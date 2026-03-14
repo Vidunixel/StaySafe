@@ -8,7 +8,7 @@ export type HeatmapRegion = {
   intensity: number;
 };
 
-// Mock Data Generators for Victoria (focusing around Melbourne/Geelong/Ballarat)
+// Mock Data for crime heatmap (Victoria: Melbourne/Geelong/Ballarat)
 export const generateMockHeatmap = (): HeatmapRegion[] => {
   const regions = [
     { name: 'Melbourne CBD', center: [-37.8136, 144.9631] as [number, number], radius: 3000, risk: 'high' as const },
@@ -25,26 +25,8 @@ export const generateMockHeatmap = (): HeatmapRegion[] => {
 
   return regions.map((r) => ({
     ...r,
-    color: r.risk === 'high' ? '#dc2626' : r.risk === 'medium' ? '#f59e0b' : '#10b981',
-    fillColor: r.risk === 'high' ? '#f87171' : r.risk === 'medium' ? '#fbbf24' : '#34d399',
+    color: r.risk === 'high' ? '#7c3aed' : r.risk === 'medium' ? '#c026d3' : '#0891b2',
+    fillColor: r.risk === 'high' ? '#a78bfa' : r.risk === 'medium' ? '#e879f9' : '#22d3ee',
     intensity: r.risk === 'high' ? 0.4 : r.risk === 'medium' ? 0.3 : 0.2,
   }));
 };
-
-export const generateRandomPoints = (
-  center: [number, number],
-  radiusKm: number,
-  count: number,
-): [number, number][] => {
-  const points: [number, number][] = [];
-  for (let i = 0; i < count; i++) {
-    // Random point within a circle
-    const r = (radiusKm / 111.3) * Math.sqrt(Math.random());
-    const theta = Math.random() * 2 * Math.PI;
-    const lat = center[0] + r * Math.cos(theta);
-    const lng = center[1] + r * Math.sin(theta);
-    points.push([lat, lng]);
-  }
-  return points;
-};
-

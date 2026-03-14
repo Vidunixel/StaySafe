@@ -1,11 +1,12 @@
 import React from 'react';
-import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle } from 'lucide-react';
+import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert } from 'lucide-react';
 import ToggleCard from '../ToggleCard';
 
 type SidebarReport = {
   id: string;
   type: string;
   description: string;
+  date: string;
 };
 
 type SidebarProps = {
@@ -15,6 +16,8 @@ type SidebarProps = {
   setShowCCTV: React.Dispatch<React.SetStateAction<boolean>>;
   showLighting: boolean;
   setShowLighting: React.Dispatch<React.SetStateAction<boolean>>;
+  showReports: boolean;
+  setShowReports: React.Dispatch<React.SetStateAction<boolean>>;
   reports: SidebarReport[];
 };
 
@@ -25,6 +28,8 @@ export default function Sidebar({
   setShowCCTV,
   showLighting,
   setShowLighting,
+  showReports,
+  setShowReports,
   reports,
 }: SidebarProps) {
   return (
@@ -49,7 +54,7 @@ export default function Sidebar({
             icon={<MapIcon className="w-5 h-5" />}
             title="Crime Heatmap"
             description="Predicted crime risk areas"
-            colorClass="text-red-600 bg-red-50 border-red-200"
+            colorClass="text-violet-600 bg-violet-50 border-violet-200"
           />
           <ToggleCard
             active={showCCTV}
@@ -67,19 +72,29 @@ export default function Sidebar({
             description="Well-lit public areas"
             colorClass="text-amber-500 bg-amber-50 border-amber-200"
           />
+          <ToggleCard
+            active={showReports}
+            onClick={() => setShowReports((prev) => !prev)}
+            icon={<ShieldAlert className="w-5 h-5" />}
+            title="User Reports"
+            description="Incident and safety reports"
+            colorClass="text-red-600 bg-red-50 border-red-200"
+          />
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">How to Report</h2>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
-            <p className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              <span>
-                Click anywhere on the map to drop a pin and report an incident or unsafe area.
-              </span>
-            </p>
+        {reports.length === 0 && (
+          <div className="mt-8">
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">How to Report</h2>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <span>
+                  Click anywhere on the map to drop a pin and report an incident or unsafe area.
+                </span>
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {reports.length > 0 && (
           <div className="mt-8">
@@ -96,6 +111,9 @@ export default function Sidebar({
                     <div className="font-semibold text-slate-800">{report.type}</div>
                     <div className="text-slate-500 text-xs mt-1 truncate">
                       {report.description}
+                    </div>
+                    <div className="text-slate-400 text-xs mt-1.5">
+                      {new Date(report.date).toLocaleString()}
                     </div>
                   </div>
                 ))}

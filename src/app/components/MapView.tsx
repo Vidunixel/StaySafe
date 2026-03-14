@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -13,10 +13,10 @@ import { User } from "lucide-react";
 import * as L from 'leaflet';
 import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
-import { generateMockHeatmap, generateRandomPoints } from '../../utils/mockData';
+import { generateMockHeatmap } from '../../utils/mockData';
 import { useEffect, useState } from "react";
-
-
+import { loadCctvLocations } from '../../utils/cctvLocations';
+import { loadStreetLights } from '../../utils/streetLights';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -43,7 +43,8 @@ type MapViewProps = {
   showHeatmap: boolean;
   showCCTV: boolean;
   showLighting: boolean;
-  reports: Array<{id: string, lat: number, lng: number, type: string, description: string}>;
+  showReports: boolean;
+  reports: Array<{id: string, lat: number, lng: number, type: string, description: string, date: string}>;
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: {lat: number, lng: number} | null;
 };
@@ -52,6 +53,7 @@ export default function MapView({
   showHeatmap, 
   showCCTV, 
   showLighting, 
+  showReports,
   reports,
   onMapClick,
   draftLocation
@@ -59,7 +61,7 @@ export default function MapView({
   
   // Memoize mock data so it doesn't regenerate on every render
   const heatmapData = useMemo(() => generateMockHeatmap(), []);
-
+  
   // Set user location as center on initial load
   const [mapCenter, setMapCenter] = useState<{lat: number, lng: number} | null>(null);
 
@@ -76,19 +78,15 @@ export default function MapView({
     );
   }, []);
 
-  const cctvPoints = useMemo(() => {
-    // Generate some clusters around major areas
-    const melbourne = generateRandomPoints([-37.8136, 144.9631], 5, 40);
-    const dandenong = generateRandomPoints([-37.9810, 145.2150], 3, 15);
-    const geelong = generateRandomPoints([-38.1499, 144.3617], 4, 20);
-    return [...melbourne, ...dandenong, ...geelong];
+  
+  const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
+  useEffect(() => {
+    loadCctvLocations().then(setCctvPoints);
   }, []);
 
-  const lightingPoints = useMemo(() => {
-    // Generate more widespread lighting points
-    const melbourneWide = generateRandomPoints([-37.8136, 144.9631], 15, 100);
-    const geelongWide = generateRandomPoints([-38.1499, 144.3617], 8, 30);
-    return [...melbourneWide, ...geelongWide];
+  const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
+  useEffect(() => {
+    loadStreetLights(2000).then(setLightingPoints);
   }, []);
 
   function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
@@ -180,7 +178,7 @@ export default function MapView({
         ))}
 
         {/* User Reports Layer */}
-        {reports.map((report) => (
+        {showReports && reports.map((report) => (
           <Marker 
             key={report.id} 
             position={[report.lat, report.lng]} 
@@ -194,7 +192,7 @@ export default function MapView({
                 </div>
                 <p className="text-sm text-slate-600 mb-2">{report.description}</p>
                 <p className="text-xs text-slate-400">
-                  Reported: {new Date(report.date).toLocaleDateString()}
+                  Reported: {new Date(report.date).toLocaleString()}
                 </p>
               </div>
             </Popup>
@@ -216,14 +214,20 @@ export default function MapView({
         <div className="space-y-2 text-sm">
           {showHeatmap && (
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500 opacity-60"></div>
+              <div className="w-3 h-3 rounded-full bg-violet-500 opacity-60"></div>
               <span className="text-slate-600">High Risk Area</span>
             </div>
           )}
           {showHeatmap && (
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500 opacity-60"></div>
+              <div className="w-3 h-3 rounded-full bg-fuchsia-500 opacity-60"></div>
               <span className="text-slate-600">Medium Risk Area</span>
+            </div>
+          )}
+          {showHeatmap && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-cyan-500 opacity-60"></div>
+              <span className="text-slate-600">Low Risk Area</span>
             </div>
           )}
           {showCCTV && (
@@ -242,12 +246,14 @@ export default function MapView({
               <span className="text-slate-600">Street Lighting</span>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-100 border border-red-200 flex items-center justify-center">
-              <ShieldAlert className="w-2.5 h-2.5 text-red-700" />
+          {showReports && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-red-100 border border-red-200 flex items-center justify-center">
+                <ShieldAlert className="w-2.5 h-2.5 text-red-700" />
+              </div>
+              <span className="text-slate-600">User Report</span>
             </div>
-            <span className="text-slate-600">User Report</span>
-          </div>
+          )}
         </div>
       </div>
     </div>
