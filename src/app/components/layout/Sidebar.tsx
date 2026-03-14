@@ -6,16 +6,11 @@ import {
   Lightbulb,
   AlertTriangle,
   ShieldAlert,
+  Building2,
   Route,
 } from "lucide-react";
 import ToggleCard from "../ToggleCard";
-
-type SidebarReport = {
-  id: string;
-  type: string;
-  description: string;
-  date: string;
-};
+import type { Report } from "../../App";
 
 type SidebarProps = {
   showHeatmap: boolean;
@@ -30,7 +25,11 @@ type SidebarProps = {
   setShowNavigation: React.Dispatch<React.SetStateAction<boolean>>;
   destination: { lat: number; lng: number } | null;
   clearNavigationDestination: () => void;
-  reports: SidebarReport[];
+  showPoliceStations: boolean;
+  setShowPoliceStations: React.Dispatch<React.SetStateAction<boolean>>;
+  showPedestrianNetwork: boolean;
+  setShowPedestrianNetwork: React.Dispatch<React.SetStateAction<boolean>>;
+  reports: Report[];
 };
 
 export default function Sidebar({
@@ -46,8 +45,17 @@ export default function Sidebar({
   setShowNavigation,
   destination,
   clearNavigationDestination,
+  showPoliceStations,
+  setShowPoliceStations,
+  showPedestrianNetwork,
+  setShowPedestrianNetwork,
   reports,
 }: SidebarProps) {
+  const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const recentReports = reports.filter(
+    (r) => new Date(r.created_at).getTime() >= twentyFourHoursAgo
+  );
+
   return (
     <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-lg relative">
       <div className="p-6 border-b border-slate-100 flex items-center gap-3">
@@ -103,6 +111,22 @@ export default function Sidebar({
             colorClass="text-red-600 bg-red-50 border-red-200"
           />
           <ToggleCard
+            active={showPoliceStations}
+            onClick={() => setShowPoliceStations((prev) => !prev)}
+            icon={<Building2 className="w-5 h-5" />}
+            title="Police Stations"
+            description="Victoria Police station locations"
+            colorClass="text-indigo-600 bg-indigo-50 border-indigo-200"
+          />
+          <ToggleCard
+            active={showPedestrianNetwork}
+            onClick={() => setShowPedestrianNetwork((prev) => !prev)}
+            icon={<Route className="w-5 h-5" />}
+            title="Pedestrian Network"
+            description="Footpaths and walking paths"
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
+          />
+          <ToggleCard
             active={showNavigation}
             onClick={() => setShowNavigation((prev) => !prev)}
             icon={<Route className="w-5 h-5" />}
@@ -147,13 +171,13 @@ export default function Sidebar({
           </div>
         )}
 
-        {reports.length > 0 && (
+        {recentReports.length > 0 && (
           <div className="mt-8">
             <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
-              Recent Reports
+              Recent Reports (24h)
             </h2>
             <div className="space-y-3">
-              {reports
+              {recentReports
                 .slice()
                 .reverse()
                 .map((report) => (
@@ -162,13 +186,13 @@ export default function Sidebar({
                     className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm"
                   >
                     <div className="font-semibold text-slate-800">
-                      {report.type}
+                      {report.incident_type}
                     </div>
                     <div className="text-slate-500 text-xs mt-1 truncate">
                       {report.description}
                     </div>
                     <div className="text-slate-400 text-xs mt-1.5">
-                      {new Date(report.date).toLocaleString()}
+                      {new Date(report.created_at).toLocaleString()}
                     </div>
                   </div>
                 ))}

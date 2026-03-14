@@ -1,6 +1,6 @@
 /**
  * Load police station locations from data/police_stations.csv.
- * CSV columns: X (lng), Y (lat), ..., facility_name, ...
+ * CSV columns: X (lng), Y (lat), ..., facility_name
  */
 import policeStationsCsvUrl from '../../data/police_stations.csv?url';
 
@@ -9,19 +9,18 @@ export type PoliceStation = {
   name: string;
 };
 
-function parseLineToStation(line: string): PoliceStation | null {
+function parseRow(line: string): PoliceStation | null {
   const parts = line.split(',');
-  if (parts.length < 2) return null;
+  if (parts.length < 8) return null;
   const lng = parseFloat(parts[0]);
   const lat = parseFloat(parts[1]);
   if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
-  const nameMatch = line.match(/POLICING FACILITY,([^,]+),OPERATIONAL/);
-  const name = nameMatch ? nameMatch[1].trim() : 'Police Station';
+  const name = (parts[7] ?? 'Police Station').trim();
   return { position: [lat, lng], name };
 }
 
 /**
- * Fetch and parse police_stations.csv, return array of { position, name }.
+ * Fetch and parse police_stations.csv, return stations for map markers.
  */
 export async function loadPoliceStations(): Promise<PoliceStation[]> {
   try {
@@ -34,8 +33,8 @@ export async function loadPoliceStations(): Promise<PoliceStation[]> {
     const lines = text.split(/\r?\n/).filter(Boolean);
     const stations: PoliceStation[] = [];
     for (let i = 1; i < lines.length; i++) {
-      const station = parseLineToStation(lines[i]);
-      if (station) stations.push(station);
+      const row = parseRow(lines[i]);
+      if (row) stations.push(row);
     }
     return stations;
   } catch (e) {

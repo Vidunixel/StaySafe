@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -11,17 +11,27 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import * as L from "leaflet";
-import { ShieldAlert, Video, Lightbulb, Route } from "lucide-react";
+import {
+  ShieldAlert,
+  Video,
+  Lightbulb,
+  Building2,
+  Route,
+} from "lucide-react";
 import {
   cctvIcon,
   lightingIcon,
   reportIcon,
   draftIcon,
   userIcon,
+  policeStationIcon,
 } from "../../utils/mapIcons";
 import { generateMockHeatmap } from "../../utils/mockData";
 import { loadCctvLocations } from "../../utils/cctvLocations";
 import { loadStreetLights } from "../../utils/streetLights";
+import { loadPoliceStations } from "../../utils/policeStations";
+import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
+import type { Report } from "../App";
 
 type LatLngTuple = [number, number];
 
@@ -67,14 +77,9 @@ type MapViewProps = {
   showLighting: boolean;
   showReports: boolean;
   showNavigation: boolean;
-  reports: Array<{
-    id: string;
-    lat: number;
-    lng: number;
-    type: string;
-    description: string;
-    date: string;
-  }>;
+  showPoliceStations: boolean;
+  showPedestrianNetwork: boolean;
+  reports: Report[];
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: { lat: number; lng: number } | null;
   destination: { lat: number; lng: number } | null;
@@ -88,6 +93,8 @@ export default function MapView({
   showCCTV,
   showLighting,
   showReports,
+  showPoliceStations,
+  showPedestrianNetwork,
   showNavigation,
   reports,
   onMapClick,
@@ -121,6 +128,20 @@ export default function MapView({
   const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
   useEffect(() => {
     loadStreetLights(2000).then(setLightingPoints);
+  }, []);
+
+  const [policeStations, setPoliceStations] = useState<
+    Array<{ position: [number, number]; name: string }>
+  >([]);
+  useEffect(() => {
+    loadPoliceStations().then(setPoliceStations);
+  }, []);
+
+  const [pedestrianSegments, setPedestrianSegments] = useState<
+    [number, number][][]
+  >([]);
+  useEffect(() => {
+    loadPedestrianNetwork(3000).then(setPedestrianSegments);
   }, []);
 
   const [fromInput, setFromInput] = useState("Current location");
@@ -194,6 +215,17 @@ export default function MapView({
       lat: Number(results[0].lat),
       lng: Number(results[0].lon),
     };
+  }
+
+  function getReportCoordinates(report: Report): LatLngTuple | null {
+    const coords = report.geo_coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+
+    const lat = Number(coords[0]);
+    const lng = Number(coords[1]);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+    return [lat, lng];
   }
 
   async function fetchWalkingRoute(
@@ -388,7 +420,8 @@ export default function MapView({
       if (lightingNearby) lightingCoverage += 1;
 
       reports.forEach((report) => {
-        if (distanceMeters(samplePoint, [report.lat, report.lng]) <= 250) {
+        const coordinates = getReportCoordinates(report);
+        if (coordinates && distanceMeters(samplePoint, coordinates) <= 250) {
           nearbyReportIds.add(report.id);
         }
       });
@@ -511,31 +544,58 @@ export default function MapView({
               </Popup>
             </Marker>
           ))}
-
         {showReports &&
-          reports.map((report) => (
+          reports.map((report) => {
+            const coordinates = getReportCoordinates(report);
+            if (!coordinates) return null;
+
+            return (
+              <Marker key={report.id} position={coordinates} icon={reportIcon}>
+                <Popup>
+                  <div className="font-sans min-w-[200px]">
+                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
+                      <ShieldAlert className="w-4 h-4 text-red-600" />
+                      <h3 className="font-bold text-sm text-slate-900">
+                        {report.incident_type}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-2">
+                      {report.description}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Reported: {new Date(report.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+        {showPoliceStations &&
+          policeStations.map((station, idx) => (
             <Marker
-              key={report.id}
-              position={[report.lat, report.lng]}
-              icon={reportIcon}
+              key={`police-${idx}`}
+              position={station.position}
+              icon={policeStationIcon}
             >
               <Popup>
-                <div className="font-sans min-w-[200px]">
-                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
-                    <ShieldAlert className="w-4 h-4 text-red-600" />
-                    <h3 className="font-bold text-sm text-slate-900">
-                      {report.type}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-slate-600 mb-2">
-                    {report.description}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Reported: {new Date(report.date).toLocaleString()}
-                  </p>
+                <div className="font-sans text-xs">
+                  <span className="font-semibold text-indigo-700 block mb-1">
+                    Police Station
+                  </span>
+                  <span className="text-slate-600">{station.name}</span>
                 </div>
               </Popup>
             </Marker>
+          ))}
+
+        {showPedestrianNetwork &&
+          pedestrianSegments.map((segment, idx) => (
+            <Polyline
+              key={`pedestrian-${idx}`}
+              positions={segment}
+              pathOptions={{ color: "#10b981", weight: 2, opacity: 0.35 }}
+            />
           ))}
 
         {draftLocation && (
@@ -667,6 +727,22 @@ export default function MapView({
                 <ShieldAlert className="w-2.5 h-2.5 text-red-700" />
               </div>
               <span className="text-slate-600">User Report</span>
+            </div>
+          )}
+          {showPoliceStations && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-indigo-100 border border-indigo-200 flex items-center justify-center">
+                <Building2 className="w-2.5 h-2.5 text-indigo-700" />
+              </div>
+              <span className="text-slate-600">Police Station</span>
+            </div>
+          )}
+          {showPedestrianNetwork && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                <Route className="w-2.5 h-2.5 text-emerald-700" />
+              </div>
+              <span className="text-slate-600">Pedestrian Network</span>
             </div>
           )}
         </div>

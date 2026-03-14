@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 
+const GEO_CODING_URL =
+  "https://lvnnqtsvjqcgrimjgrad.supabase.co/functions/v1/geo-coding";
+
 type CrimeStatRow = {
   id: string;
   local_gov_area: string;
@@ -8,7 +11,17 @@ type CrimeStatRow = {
   [key: string]: unknown;
 };
 
-/** Minimal type for GeoJSON returned by the edge function (Feature, FeatureCollection, etc.) */
+/** Geo-coding API response: contains geojson (Feature with Polygon) */
+type GeoCodingResponse = {
+  address_query?: string;
+  formatted_address?: string;
+  place_id?: string;
+  center?: { lat: number; lng: number };
+  geojson?: GeoJSONResponse;
+  [key: string]: unknown;
+};
+
+/** Minimal type for GeoJSON returned by the edge function (Feature with Polygon) */
 export type GeoJSONResponse = Record<string, unknown> & {
   type?: string;
   geometry?: unknown;
@@ -42,27 +55,31 @@ export function useCrimeStats() {
         }
 
         const stats = (rows ?? []) as CrimeStatRow[];
+        const anonKey =
+          (import.meta as unknown as { env?: Record<string, string> }).env
+            ?.VITE_SUPABASE_ANON_KEY ?? "";
 
         const combined = await Promise.all(
           stats.map(async (stat) => {
-            const { data: invokeData, error: invokeError } = await supabase.functions.invoke(
-              "geo-coding",
-              { body: { address: stat.local_gov_area } }
-            );
+            const url = `${GEO_CODING_URL}?address=${encodeURIComponent(stat.local_gov_area)}`;
+            const res = await fetch(url, {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${anonKey}`,
+              },
+            });
 
-            if (invokeError) {
+            if (!res.ok) {
               throw new Error(
-                `Geo-coding failed for ${stat.local_gov_area}: ${invokeError.message}`
+                `Geo-coding failed for ${stat.local_gov_area}: ${res.status} ${res.statusText}`
               );
             }
 
-            // Response may be the GeoJSON directly or wrapped (e.g. { data: geojson })
-            const raw = invokeData != null && typeof invokeData === "object" ? invokeData : {};
-            const geojson = (
-              "data" in raw && raw.data != null && typeof raw.data === "object"
-                ? raw.data
-                : raw
-            ) as GeoJSONResponse;
+            const body = (await res.json()) as GeoCodingResponse;
+            const geojson =
+              body?.geojson != null && typeof body.geojson === "object"
+                ? (body.geojson as GeoJSONResponse)
+                : ({} as GeoJSONResponse);
 
             return {
               id: stat.id,
