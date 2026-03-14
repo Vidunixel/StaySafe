@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import MapView from './components/MapView';
 import Sidebar from './components/layout/Sidebar';
 import ReportModal from './components/ReportModal';
 import { useMapState } from '../hooks/useMapState';
-import { supabase } from '../lib/supabase';
-import type { ReportFormValues } from '../hooks/useMapState';
 
 export type Report = {
   id: string;
-  geo_coordinates: number[];
-  incident_type: string;
+  lat: number;
+  lng: number;
+  type: string;
   description: string;
-  created_at: string;
+  date: string;
 };
 
 export default function App() {
@@ -24,62 +23,12 @@ export default function App() {
     setShowCCTV,
     setShowLighting,
     setShowReports,
+    reports,
     reportingLocation,
     handleMapClick,
+    submitReport,
     setReportingLocation,
   } = useMapState();
-
-  const [reports, setReports] = useState<Report[]>([]);
-
-  const fetchReports = async () => {
-    const { data, error } = await supabase
-      .from('reports')
-      .select('id, geo_coordinates, incident_type, description, created_at');
-    if (error) return;
-    const rows = (data ?? []) as Array<{
-      id: string;
-      geo_coordinates: number[] | unknown;
-      incident_type: string;
-      description: string;
-      created_at: string;
-    }>;
-    const normalized: Report[] = rows
-      .filter((row) => {
-        const coords = row.geo_coordinates;
-        return Array.isArray(coords) && coords.length >= 2 && coords.every((n) => typeof n === 'number');
-      })
-      .map((row) => ({
-        id: row.id,
-        geo_coordinates: row.geo_coordinates as number[],
-        incident_type: row.incident_type,
-        description: row.description ?? '',
-        created_at: row.created_at ?? new Date().toISOString(),
-      }));
-    setReports(normalized);
-  };
-
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const submitReport = async (data: ReportFormValues) => {
-    if (!reportingLocation) return;
-
-    const newReport = {
-      geo_coordinates: [reportingLocation.lat, reportingLocation.lng],
-      incident_type: data.incidentType,
-      description: data.description,
-    };
-
-    const { error } = await supabase
-      .from('reports')
-      .insert(newReport);
-
-    if (!error) {
-      await fetchReports();
-      setReportingLocation(null);
-    }
-  };
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-hidden">
