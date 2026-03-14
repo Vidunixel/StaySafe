@@ -12,6 +12,7 @@ export function useMapState() {
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [showCCTV, setShowCCTV] = useState(false);
   const [showLighting, setShowLighting] = useState(false);
+  const [showReports, setShowReports] = useState(true);
 
   const [reports, setReports] = useState<Report[]>([]);
   const [reportingLocation, setReportingLocation] = useState<ReportingLocation>(null);
@@ -19,6 +20,7 @@ export function useMapState() {
   const toggleHeatmap = () => setShowHeatmap((prev) => !prev);
   const toggleCCTV = () => setShowCCTV((prev) => !prev);
   const toggleLighting = () => setShowLighting((prev) => !prev);
+  const toggleReports = () => setShowReports((prev) => !prev);
 
   const handleMapClick = (lat: number, lng: number) => {
     setReportingLocation({ lat, lng });
@@ -45,12 +47,15 @@ export function useMapState() {
     showHeatmap,
     showCCTV,
     showLighting,
+    showReports,
     toggleHeatmap,
     toggleCCTV,
     toggleLighting,
+    toggleReports,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
+    setShowReports,
 
     // reporting state
     reports,

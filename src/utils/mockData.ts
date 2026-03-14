@@ -25,8 +25,8 @@ export const generateMockHeatmap = (): HeatmapRegion[] => {
 
   return regions.map((r) => ({
     ...r,
-    color: r.risk === 'high' ? '#dc2626' : r.risk === 'medium' ? '#f59e0b' : '#10b981',
-    fillColor: r.risk === 'high' ? '#f87171' : r.risk === 'medium' ? '#fbbf24' : '#34d399',
+    color: r.risk === 'high' ? '#7c3aed' : r.risk === 'medium' ? '#c026d3' : '#0891b2',
+    fillColor: r.risk === 'high' ? '#a78bfa' : r.risk === 'medium' ? '#e879f9' : '#22d3ee',
     intensity: r.risk === 'high' ? 0.4 : r.risk === 'medium' ? 0.3 : 0.2,
   }));
 };
