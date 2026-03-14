@@ -18,6 +18,7 @@ import {
   Lightbulb,
   Building2,
   Route,
+  Megaphone,
 } from "lucide-react";
 import {
   cctvIcon,
@@ -51,12 +52,16 @@ L.Icon.Default.mergeOptions({
 
 function MapEventHandler({
   onMapClick,
+  reportModeActive,
 }: {
   onMapClick: (lat: number, lng: number) => void;
+  reportModeActive: boolean;
 }) {
   useMapEvents({
     click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng);
+      if (reportModeActive) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
@@ -169,6 +174,10 @@ export default function MapView({
   } | null>(null);
   const [isFindingRoute, setIsFindingRoute] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [reportModeActive, setReportModeActive] = useState(false);
+  const [showReportToast, setShowReportToast] = useState(false);
+  const previousDraftLocationRef = useRef<{ lat: number; lng: number } | null>(null);
+  const reportToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
     const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -287,6 +296,35 @@ export default function MapView({
       setRouteError(null);
     }
   }, [showNavigation, destination]);
+
+  useEffect(() => {
+    // If a report pin existed and then the form is closed/submitted (draft cleared),
+    // exit reporting mode automatically.
+    if (previousDraftLocationRef.current && !draftLocation && reportModeActive) {
+      setReportModeActive(false);
+    }
+    previousDraftLocationRef.current = draftLocation;
+  }, [draftLocation, reportModeActive]);
+
+  useEffect(() => {
+    if (!reportModeActive) {
+      setShowReportToast(false);
+      if (reportToastTimerRef.current) {
+        clearTimeout(reportToastTimerRef.current);
+        reportToastTimerRef.current = null;
+      }
+      return;
+    }
+
+    setShowReportToast(true);
+    if (reportToastTimerRef.current) {
+      clearTimeout(reportToastTimerRef.current);
+    }
+    reportToastTimerRef.current = setTimeout(() => {
+      setShowReportToast(false);
+      reportToastTimerRef.current = null;
+    }, 2600);
+  }, [reportModeActive]);
 
   useEffect(() => {
     if (!showNavigation || !destination) return;
@@ -492,7 +530,7 @@ export default function MapView({
             <Marker position={userLocation} icon={userIcon} />
           </>
         )}
-        <MapEventHandler onMapClick={onMapClick} />
+        <MapEventHandler onMapClick={onMapClick} reportModeActive={reportModeActive} />
 
         {/* Crime stats heatmap: Supabase crime_stats geo_bounds polygons; 10 = lightest red, 180 = darkest, transparent */}
         {showHeatmap &&
@@ -519,6 +557,15 @@ export default function MapView({
                   weight: 1,
                   fillColor,
                   fillOpacity,
+                }}
+                eventHandlers={{
+                  click: (e) => {
+                    if (!reportModeActive) return;
+                    const { lat, lng } = (e as any).latlng ?? {};
+                    if (typeof lat === "number" && typeof lng === "number") {
+                      onMapClick(lat, lng);
+                    }
+                  },
                 }}
               >
                 <Popup>
@@ -661,9 +708,48 @@ export default function MapView({
       <div
         onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
         className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
-        >
-          {recenterIcon}
+      >
+        {recenterIcon}
       </div>
+
+      <div className="absolute top-6 right-6 z-[460] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div
+            className={`h-11 w-11 rounded-xl border flex items-center justify-center transition-colors ${
+              reportModeActive
+                ? "border-red-200 bg-red-50 text-red-600"
+                : "border-slate-200 bg-slate-50 text-slate-600"
+            }`}
+          >
+            <Megaphone className="h-5 w-5" />
+          </div>
+
+          <div className="flex flex-col">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
+              Community Safety
+            </span>
+            <button
+              type="button"
+              onClick={() => setReportModeActive((prev) => !prev)}
+              className={`mt-0.5 inline-flex items-center justify-center rounded-xl border px-4 py-2 text-base font-semibold transition-all ${
+                reportModeActive
+                  ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                  : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {reportModeActive ? "Cancel" : "Report an Incident"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showReportToast && (
+        <div className="absolute inset-0 z-[470] flex items-center justify-center pointer-events-none">
+          <div className="rounded-xl border border-blue-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-800 shadow-2xl backdrop-blur-sm">
+            Click on a point in the map to report.
+          </div>
+        </div>
+      )}
 
       {showNavigation && (
         <form
