@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
-  Circle,
   Marker,
   Popup,
   Polyline,
+  GeoJSON,
   useMapEvents,
   useMap,
 } from "react-leaflet";
@@ -26,8 +26,8 @@ import {
   userIcon,
   policeStationIcon,
 } from "../../utils/mapIcons";
-import { generateMockHeatmap } from "../../utils/mockData";
 import { loadCctvLocations } from "../../utils/cctvLocations";
+import { useCrimeStats } from "../../hooks/useCrimeStats";
 import { loadStreetLights } from "../../utils/streetLights";
 import { loadPoliceStations } from "../../utils/policeStations";
 import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
@@ -102,7 +102,8 @@ export default function MapView({
   destination,
   setDestination,
 }: MapViewProps) {
-  const heatmapData = useMemo(() => generateMockHeatmap(), []);
+  const { data: crimeStats, isLoading: crimeStatsLoading, maxIncidentCount } = useCrimeStats();
+  const hasRecenteredRef = useRef(false);
   const [mapCenter, setMapCenter] = useState<{
     lat: number;
     lng: number;
@@ -458,8 +459,9 @@ export default function MapView({
     const map = useMap();
 
     useEffect(() => {
-      if (center) {
+      if (center && !hasRecenteredRef.current) {
         map.setView(center, 15);
+        hasRecenteredRef.current = true;
       }
     }, [center, map]);
 
@@ -486,34 +488,48 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} />
 
+        {/* Crime stats heatmap: Supabase crime_stats + geo-coding polygons; 10 = lightest red, 180 = darkest, transparent */}
         {showHeatmap &&
-          heatmapData.map((region, idx) => (
-            <Circle
-              key={`heat-${idx}`}
-              center={region.center as [number, number]}
-              pathOptions={{
-                color: region.color,
-                fillColor: region.fillColor,
-                fillOpacity: region.intensity,
-                weight: 1,
-              }}
-              radius={region.radius}
-            >
-              <Popup>
-                <div className="font-sans">
-                  <h3 className="font-bold text-sm text-slate-800">
-                    {region.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1 capitalize">
-                    Predicted Risk:{" "}
-                    <span className="font-semibold text-slate-700">
-                      {region.risk}
-                    </span>
-                  </p>
-                </div>
-              </Popup>
-            </Circle>
-          ))}
+          !crimeStatsLoading &&
+          crimeStats.map((stat) => {
+            const heatScale = Math.max(
+              0,
+              Math.min(1, (stat.incident_count - 10) / (180 - 10)),
+            );
+            const lightness = 92 - heatScale * 62;
+            const fillColor = `hsl(0, 75%, ${lightness}%)`;
+            const fillOpacity = 0.35 + heatScale * 0.25;
+            const g = stat.geojson as {
+              geometry?: { coordinates?: unknown };
+              features?: Array<{ geometry?: { coordinates?: unknown } }>;
+            };
+            const coords =
+              g?.geometry?.coordinates ??
+              g?.features?.[0]?.geometry?.coordinates ??
+              "";
+            const geoKey = `${stat.id}-${JSON.stringify(coords)}`;
+
+            return (
+              <GeoJSON
+                key={geoKey}
+                data={stat.geojson}
+                style={() => ({
+                  color: "rgba(139, 0, 0, 0.5)",
+                  weight: 1,
+                  fillColor,
+                  fillOpacity,
+                })}
+                onEachFeature={(_feature, layer) => {
+                  layer.bindPopup(
+                    `<div class="font-sans min-w-[140px]">
+                      <h3 class="font-bold text-sm text-slate-800">${stat.local_gov_area}</h3>
+                      <p class="text-xs text-slate-500 mt-1">Incident count: <span class="font-semibold text-slate-700">${stat.incident_count}</span></p>
+                    </div>`,
+                  );
+                }}
+              />
+            );
+          })}
 
         {showCCTV &&
           cctvPoints.map((point, idx) => (
