@@ -53,5 +53,5 @@ export const policeStationIcon = createLeafletIcon(
 );
 
 export const recenterIcon = (
-    <Crosshair className="w-6 h-6 text-blue-500" />
+    <Crosshair className="w-6 h-6 text-white" />
 );

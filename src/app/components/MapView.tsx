@@ -732,50 +732,38 @@ export default function MapView({
       {/* Floating Recenter Button */}
       <div
         onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
-        className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
+        className="absolute bottom-24 right-2 z-[500] cursor-pointer bg-blue-500 p-2 rounded-full flex items-center justify-center hover:bg-blue-600"
         >
           {recenterIcon} 
       </div>
-
-      <div className="absolute bottom-36 right-2 z-[460] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div
-            className={`h-11 w-11 rounded-xl border flex items-center justify-center transition-colors ${
-              reportModeActive
-                ? "border-red-200 bg-red-50 text-red-600"
-                : "border-slate-200 bg-slate-50 text-slate-600"
+      <div className="absolute bottom-35 right-2 z-[400]">
+        {/* Icon button */}
+        <div className="relative group">
+        <button
+          onClick={() => setReportModeActive((prev) => !prev)}
+          className={`h-10 w-10 rounded-xl border flex items-center justify-center hover:bg-red-700 transition-colors
+            ${reportModeActive
+              ? "border-red-200 bg-red-50 text-red-600"
+              : "border-red-300 bg-red-600 text-white"
             }`}
-          >
-            <Megaphone className="h-5 w-5" />
-          </div>
+        >
+          <Megaphone className="h-5 w-5" />
+        </button>
 
-          <div className="flex flex-col">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
+        {/* Tooltip with title + description on hover */}
+        <div className="absolute right-full bottom-1/2 mr-3 w-44 rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200">
+          <div className="flex flex-col p-3 gap-1">
+            <span className="text-[12px] uppercase tracking-wider font-semibold text-slate-400">
               Community Safety
             </span>
-            <button
-              type="button"
-              onClick={() => setReportModeActive((prev) => !prev)}
-              className={`mt-0.5 inline-flex items-center justify-center rounded-xl border px-4 py-2 text-base font-semibold transition-all ${
-                reportModeActive
-                  ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                  : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
-              }`}
-            >
-              {reportModeActive ? "Cancel" : "Report an Incident"}
-            </button>
+            <span className="text-xs text-slate-700">
+              Report an incident by clicking on a point in the map.
+            </span>
           </div>
         </div>
       </div>
+      </div>
 
-      {showReportToast && (
-        <div className="absolute inset-0 z-[470] flex items-center justify-center pointer-events-none">
-          <div className="rounded-xl border border-blue-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-800 shadow-2xl backdrop-blur-sm">
-            Click on a point in the map to report.
-          </div>
-        </div>
-      )}
-  
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
