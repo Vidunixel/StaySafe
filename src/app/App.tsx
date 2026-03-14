@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import MapView from './components/MapView';
-import Sidebar from './components/layout/Sidebar';
-import ReportModal from './components/ReportModal';
-import { useMapState } from '../hooks/useMapState';
-import { supabase } from '../lib/supabase';
-import type { ReportFormValues } from '../hooks/useMapState';
+import React, { useEffect, useState } from "react";
+import MapView from "./components/MapView";
+import Sidebar from "./components/layout/Sidebar";
+import ReportModal from "./components/ReportModal";
+import { useMapState, type ReportFormValues } from "../hooks/useMapState";
+import { supabase } from "../lib/supabase";
 
 export type Report = {
   id: string;
@@ -20,25 +19,30 @@ export default function App() {
     showCCTV,
     showLighting,
     showReports,
+    showNavigation,
     showPoliceStations,
     showPedestrianNetwork,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
     setShowReports,
+    setShowNavigation,
     setShowPoliceStations,
     setShowPedestrianNetwork,
     reportingLocation,
+    destination,
     handleMapClick,
+    clearNavigationDestination,
     setReportingLocation,
+    setDestination,
   } = useMapState();
 
   const [reports, setReports] = useState<Report[]>([]);
 
   const fetchReports = async () => {
     const { data, error } = await supabase
-      .from('reports')
-      .select('id, geo_coordinates, incident_type, description, created_at');
+      .from("reports")
+      .select("id, geo_coordinates, incident_type, description, created_at");
     if (error) return;
     const rows = (data ?? []) as Array<{
       id: string;
@@ -50,13 +54,17 @@ export default function App() {
     const normalized: Report[] = rows
       .filter((row) => {
         const coords = row.geo_coordinates;
-        return Array.isArray(coords) && coords.length >= 2 && coords.every((n) => typeof n === 'number');
+        return (
+          Array.isArray(coords) &&
+          coords.length >= 2 &&
+          coords.every((value) => typeof value === "number")
+        );
       })
       .map((row) => ({
         id: row.id,
         geo_coordinates: row.geo_coordinates as number[],
         incident_type: row.incident_type,
-        description: row.description ?? '',
+        description: row.description ?? "",
         created_at: row.created_at ?? new Date().toISOString(),
       }));
     setReports(normalized);
@@ -75,9 +83,7 @@ export default function App() {
       description: data.description,
     };
 
-    const { error } = await supabase
-      .from('reports')
-      .insert(newReport);
+    const { error } = await supabase.from("reports").insert(newReport);
 
     if (!error) {
       await fetchReports();
@@ -96,6 +102,10 @@ export default function App() {
         setShowLighting={setShowLighting}
         showReports={showReports}
         setShowReports={setShowReports}
+        showNavigation={showNavigation}
+        setShowNavigation={setShowNavigation}
+        destination={destination}
+        clearNavigationDestination={clearNavigationDestination}
         showPoliceStations={showPoliceStations}
         setShowPoliceStations={setShowPoliceStations}
         showPedestrianNetwork={showPedestrianNetwork}
@@ -109,9 +119,12 @@ export default function App() {
           showCCTV={showCCTV}
           showLighting={showLighting}
           showReports={showReports}
+          showNavigation={showNavigation}
           showPoliceStations={showPoliceStations}
           showPedestrianNetwork={showPedestrianNetwork}
           reports={reports}
+          destination={destination}
+          setDestination={setDestination}
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
         />
@@ -119,7 +132,9 @@ export default function App() {
         {reportingLocation && (
           <ReportModal
             reportingLocation={reportingLocation}
-            onSubmit={submitReport}
+            onSubmit={(data) => {
+              void submitReport(data);
+            }}
             onClose={() => setReportingLocation(null)}
           />
         )}
