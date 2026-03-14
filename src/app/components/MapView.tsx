@@ -14,7 +14,6 @@ import * as L from 'leaflet';
 import { ShieldAlert, Video, Lightbulb, MapPin } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap } from '../../utils/mockData';
-import { useEffect, useState } from "react";
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
 
