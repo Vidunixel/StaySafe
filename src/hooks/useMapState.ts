@@ -14,6 +14,7 @@ export function useMapState() {
   const [showLighting, setShowLighting] = useState(false);
   const [showReports, setShowReports] = useState(true);
   const [showPoliceStations, setShowPoliceStations] = useState(false);
+  const [showPedestrianNetwork, setShowPedestrianNetwork] = useState(false);
 
   const [reports, setReports] = useState<Report[]>([]);
   const [reportingLocation, setReportingLocation] = useState<ReportingLocation>(null);
@@ -23,6 +24,7 @@ export function useMapState() {
   const toggleLighting = () => setShowLighting((prev) => !prev);
   const toggleReports = () => setShowReports((prev) => !prev);
   const togglePoliceStations = () => setShowPoliceStations((prev) => !prev);
+  const togglePedestrianNetwork = () => setShowPedestrianNetwork((prev) => !prev);
 
   const handleMapClick = (lat: number, lng: number) => {
     setReportingLocation({ lat, lng });
@@ -51,16 +53,19 @@ export function useMapState() {
     showLighting,
     showReports,
     showPoliceStations,
+    showPedestrianNetwork,
     toggleHeatmap,
     toggleCCTV,
     toggleLighting,
     toggleReports,
     togglePoliceStations,
+    togglePedestrianNetwork,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
     setShowReports,
     setShowPoliceStations,
+    setShowPedestrianNetwork,
 
     // reporting state
     reports,

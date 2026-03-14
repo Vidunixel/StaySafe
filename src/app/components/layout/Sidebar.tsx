@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert, Building2 } from 'lucide-react';
+import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert, Building2, Footprints } from 'lucide-react';
 import ToggleCard from '../ToggleCard';
 
 type SidebarReport = {
@@ -20,6 +20,8 @@ type SidebarProps = {
   setShowReports: React.Dispatch<React.SetStateAction<boolean>>;
   showPoliceStations: boolean;
   setShowPoliceStations: React.Dispatch<React.SetStateAction<boolean>>;
+  showPedestrianNetwork: boolean;
+  setShowPedestrianNetwork: React.Dispatch<React.SetStateAction<boolean>>;
   reports: SidebarReport[];
 };
 
@@ -34,6 +36,8 @@ export default function Sidebar({
   setShowReports,
   showPoliceStations,
   setShowPoliceStations,
+  showPedestrianNetwork,
+  setShowPedestrianNetwork,
   reports,
 }: SidebarProps) {
   return (
@@ -66,7 +70,7 @@ export default function Sidebar({
             icon={<Video className="w-5 h-5" />}
             title="CCTV Cameras"
             description="Known public camera locations"
-            colorClass="text-blue-600 bg-blue-50 border-blue-200"
+            colorClass="text-slate-700 bg-slate-100 border-slate-200"
           />
           <ToggleCard
             active={showLighting}
@@ -90,7 +94,15 @@ export default function Sidebar({
             icon={<Building2 className="w-5 h-5" />}
             title="Police Stations"
             description="Victoria Police station locations"
-            colorClass="text-slate-600 bg-slate-50 border-slate-200"
+            colorClass="text-blue-600 bg-blue-50 border-blue-200"
+          />
+          <ToggleCard
+            active={showPedestrianNetwork}
+            onClick={() => setShowPedestrianNetwork((prev) => !prev)}
+            icon={<Footprints className="w-5 h-5" />}
+            title="Pedestrian Network"
+            description="Walking paths and footpaths"
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
           />
         </div>
 

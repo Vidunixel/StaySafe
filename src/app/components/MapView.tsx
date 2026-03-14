@@ -5,18 +5,20 @@ import {
   Circle,
   Marker,
   Popup,
+  Polyline,
   useMapEvents,
   useMap,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { User } from "lucide-react";
 import * as L from 'leaflet';
-import { ShieldAlert, Video, Lightbulb, MapPin, Building2 } from 'lucide-react';
+import { ShieldAlert, Video, Lightbulb, MapPin, Building2, Footprints } from 'lucide-react';
 import { cctvIcon, lightingIcon, reportIcon, draftIcon, userIcon, policeStationIcon } from '../../utils/mapIcons';
 import { generateMockHeatmap } from '../../utils/mockData';
 import { loadCctvLocations } from '../../utils/cctvLocations';
 import { loadStreetLights } from '../../utils/streetLights';
 import { loadPoliceStations } from '../../utils/policeStations';
+import { loadPedestrianNetwork } from '../../utils/pedestrianNetwork';
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -45,6 +47,7 @@ type MapViewProps = {
   showLighting: boolean;
   showReports: boolean;
   showPoliceStations: boolean;
+  showPedestrianNetwork: boolean;
   reports: Array<{id: string, lat: number, lng: number, type: string, description: string, date: string}>;
   onMapClick: (lat: number, lng: number) => void;
   draftLocation: {lat: number, lng: number} | null;
@@ -56,6 +59,7 @@ export default function MapView({
   showLighting, 
   showReports,
   showPoliceStations,
+  showPedestrianNetwork,
   reports,
   onMapClick,
   draftLocation
@@ -91,9 +95,14 @@ export default function MapView({
     loadStreetLights(2000).then(setLightingPoints);
   }, []);
 
-  const [policeStationPoints, setPoliceStationPoints] = useState<[number, number][]>([]);
+  const [policeStations, setPoliceStations] = useState<Array<{ position: [number, number]; name: string }>>([]);
   useEffect(() => {
-    loadPoliceStations().then(setPoliceStationPoints);
+    loadPoliceStations().then(setPoliceStations);
+  }, []);
+
+  const [pedestrianSegments, setPedestrianSegments] = useState<[number, number][][]>([]);
+  useEffect(() => {
+    loadPedestrianNetwork(3000).then(setPedestrianSegments);
   }, []);
 
   function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
@@ -161,7 +170,7 @@ export default function MapView({
           >
             <Popup>
               <div className="font-sans text-xs">
-                <span className="font-semibold text-blue-700 block mb-1">Public CCTV Camera</span>
+                <span className="font-semibold text-slate-900 block mb-1">Public CCTV Camera</span>
                 <span className="text-slate-500">Active and recording.</span>
               </div>
             </Popup>
@@ -185,19 +194,36 @@ export default function MapView({
         ))}
 
         {/* Police Stations Layer */}
-        {showPoliceStations && policeStationPoints.map((point, idx) => (
+        {showPoliceStations && policeStations.map((station, idx) => (
           <Marker 
             key={`police-${idx}`} 
-            position={point} 
+            position={station.position} 
             icon={policeStationIcon}
           >
             <Popup>
-              <div className="font-sans text-xs">
-                <span className="font-semibold text-slate-700 block mb-1">Police Station</span>
-                <span className="text-slate-500">Victoria Police facility.</span>
+              <div className="font-sans text-xs min-w-[180px]">
+                <span className="font-semibold text-blue-600 block mb-1">{station.name}</span>
+                <span className="text-slate-500 block mb-2">Victoria Police facility.</span>
+                <a
+                  href={`https://www.google.com/maps?q=${station.position[0]},${station.position[1]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 rounded-md bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Open in Google Maps
+                </a>
               </div>
             </Popup>
           </Marker>
+        ))}
+
+        {/* Pedestrian Network Layer */}
+        {showPedestrianNetwork && pedestrianSegments.map((segment, idx) => (
+          <Polyline
+            key={`ped-${idx}`}
+            positions={segment}
+            pathOptions={{ color: '#059669', weight: 2, opacity: 0.8 }}
+          />
         ))}
 
         {/* User Reports Layer */}
@@ -255,8 +281,8 @@ export default function MapView({
           )}
           {showCCTV && (
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200 flex items-center justify-center">
-                <Video className="w-2.5 h-2.5 text-blue-700" />
+              <div className="w-4 h-4 rounded bg-slate-200 border border-slate-300 flex items-center justify-center">
+                <Video className="w-2.5 h-2.5 text-slate-900" />
               </div>
               <span className="text-slate-600">CCTV Camera</span>
             </div>
@@ -271,10 +297,18 @@ export default function MapView({
           )}
           {showPoliceStations && (
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-slate-100 border border-slate-200 flex items-center justify-center">
-                <Building2 className="w-2.5 h-2.5 text-slate-700" />
+              <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200 flex items-center justify-center">
+                <Building2 className="w-2.5 h-2.5 text-blue-700" />
               </div>
               <span className="text-slate-600">Police Station</span>
+            </div>
+          )}
+          {showPedestrianNetwork && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200 flex items-center justify-center">
+                <Footprints className="w-2.5 h-2.5 text-emerald-700" />
+              </div>
+              <span className="text-slate-600">Pedestrian Network</span>
             </div>
           )}
           {showReports && (

@@ -28,7 +28,7 @@ const createLeafletIcon = (html: string) => {
 };
 
 export const cctvIcon = createLeafletIcon(
-  createCustomIconHtml(cctvSvg, 'text-blue-700', 'bg-blue-100'),
+  createCustomIconHtml(cctvSvg, 'text-slate-900', 'bg-slate-200'),
 );
 
 export const lightingIcon = createLeafletIcon(
@@ -48,5 +48,5 @@ export const userIcon = createLeafletIcon(
 );
 
 export const policeStationIcon = createLeafletIcon(
-  createCustomIconHtml(policeSvg, 'text-slate-700', 'bg-slate-100'),
+  createCustomIconHtml(policeSvg, 'text-blue-700', 'bg-blue-100'),
 );

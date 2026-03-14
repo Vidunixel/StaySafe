@@ -20,11 +20,13 @@ export default function App() {
     showLighting,
     showReports,
     showPoliceStations,
+    showPedestrianNetwork,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
     setShowReports,
     setShowPoliceStations,
+    setShowPedestrianNetwork,
     reports,
     reportingLocation,
     handleMapClick,
@@ -45,6 +47,8 @@ export default function App() {
         setShowReports={setShowReports}
         showPoliceStations={showPoliceStations}
         setShowPoliceStations={setShowPoliceStations}
+        showPedestrianNetwork={showPedestrianNetwork}
+        setShowPedestrianNetwork={setShowPedestrianNetwork}
         reports={reports}
       />
 
@@ -55,6 +59,7 @@ export default function App() {
           showLighting={showLighting}
           showReports={showReports}
           showPoliceStations={showPoliceStations}
+          showPedestrianNetwork={showPedestrianNetwork}
           reports={reports}
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
