@@ -82,8 +82,8 @@ export default function Sidebar({
             active={showHeatmap}
             onClick={() => setShowHeatmap((prev) => !prev)}
             icon={<MapIcon className="w-5 h-5" />}
-            title="Crime Heatmap"
-            description="Predicted crime risk areas"
+            title="Crime Map"
+            description="Predicted crime risk "
             colorClass="text-violet-600 bg-violet-50 border-violet-200"
           />
           <ToggleCard
@@ -91,7 +91,7 @@ export default function Sidebar({
             onClick={() => setShowCCTV((prev) => !prev)}
             icon={<Video className="w-5 h-5" />}
             title="CCTV Cameras"
-            description="Known public camera locations"
+            description="Surveillance areas"
             colorClass="text-blue-600 bg-blue-50 border-blue-200"
           />
           <ToggleCard
@@ -99,7 +99,7 @@ export default function Sidebar({
             onClick={() => setShowLighting((prev) => !prev)}
             icon={<Lightbulb className="w-5 h-5" />}
             title="Street Lighting"
-            description="Well-lit public areas"
+            description="Well-lit areas"
             colorClass="text-amber-500 bg-amber-50 border-amber-200"
           />
           <ToggleCard
@@ -107,7 +107,7 @@ export default function Sidebar({
             onClick={() => setShowReports((prev) => !prev)}
             icon={<ShieldAlert className="w-5 h-5" />}
             title="User Reports"
-            description="Incident and safety reports"
+            description="Incident reports"
             colorClass="text-red-600 bg-red-50 border-red-200"
           />
           <ToggleCard
@@ -115,7 +115,7 @@ export default function Sidebar({
             onClick={() => setShowPoliceStations((prev) => !prev)}
             icon={<Building2 className="w-5 h-5" />}
             title="Police Stations"
-            description="Victoria Police station locations"
+            description="Police locations"
             colorClass="text-indigo-600 bg-indigo-50 border-indigo-200"
           />
           <ToggleCard
@@ -123,7 +123,7 @@ export default function Sidebar({
             onClick={() => setShowPedestrianNetwork((prev) => !prev)}
             icon={<Route className="w-5 h-5" />}
             title="Pedestrian Network"
-            description="Footpaths and walking paths"
+            description="Walking paths"
             colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
           />
           <ToggleCard
@@ -131,7 +131,7 @@ export default function Sidebar({
             onClick={() => setShowNavigation((prev) => !prev)}
             icon={<Route className="w-5 h-5" />}
             title="Safe Navigation"
-            description="Click map to set destination"
+            description="Set destination"
             colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
           />
         </div>

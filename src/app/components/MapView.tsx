@@ -8,6 +8,7 @@ import {
   GeoJSON,
   useMapEvents,
   useMap,
+  ZoomControl,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import * as L from "leaflet";
@@ -24,6 +25,7 @@ import {
   reportIcon,
   draftIcon,
   userIcon,
+  recenterIcon,
   policeStationIcon,
 } from "../../utils/mapIcons";
 import { loadCctvLocations } from "../../utils/cctvLocations";
@@ -32,6 +34,7 @@ import { loadStreetLights } from "../../utils/streetLights";
 import { loadPoliceStations } from "../../utils/policeStations";
 import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
 import type { Report } from "../App";
+import type { GeoJsonObject } from "geojson";
 
 type LatLngTuple = [number, number];
 
@@ -104,20 +107,32 @@ export default function MapView({
 }: MapViewProps) {
   const { data: crimeStats, isLoading: crimeStatsLoading, maxIncidentCount } = useCrimeStats();
   const hasRecenteredRef = useRef(false);
-  const [mapCenter, setMapCenter] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setMapCenter({
+        const location = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-        });
+        };
+        setUserLocation(location);
+
+        if (!initialLoadDone && mapRef.current) {
+          mapRef.current.setView([location.lat, location.lng], 11);
+          setInitialLoadDone(true);  
+        }
       },
-      () => setMapCenter({ lat: -37.8136, lng: 144.9631 }),
+      () => {
+        const fallback = { lat: -37.8136, lng: 144.9631 };
+        setUserLocation(fallback);
+        if (mapRef.current && !initialLoadDone) {
+          mapRef.current.setView([fallback.lat, fallback.lng], 11);
+          setInitialLoadDone(true);
+        }
+      }
     );
   }, []);
 
@@ -276,7 +291,7 @@ export default function MapView({
   useEffect(() => {
     if (!showNavigation || !destination) return;
 
-    const start = routeOrigin ?? mapCenter;
+    const start = routeOrigin ?? userLocation;
     if (!start) return;
 
     let cancelled = false;
@@ -308,7 +323,7 @@ export default function MapView({
     return () => {
       cancelled = true;
     };
-  }, [destination, mapCenter, routeOrigin, showNavigation]);
+  }, [destination, userLocation, routeOrigin, showNavigation]);
 
   async function handleRouteSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -323,7 +338,7 @@ export default function MapView({
       return;
     }
 
-    if (!mapCenter) {
+    if (!userLocation) {
       setRouteError("Waiting for your current location.");
       return;
     }
@@ -336,7 +351,7 @@ export default function MapView({
         fromValue.toLowerCase() === "current location";
 
       const resolvedStart = isCurrentLocation
-        ? mapCenter
+        ? userLocation
         : await geocodePlace(fromValue);
 
       if (!resolvedStart) {
@@ -361,14 +376,14 @@ export default function MapView({
     if (routePath.length > 1) return routePath;
     if (!showNavigation || !destination) return [];
 
-    const start = routeOrigin ?? mapCenter;
+    const start = routeOrigin ?? userLocation;
     if (!start) return [];
 
     return [
       [start.lat, start.lng],
       [destination.lat, destination.lng],
     ] as LatLngTuple[];
-  }, [routePath, showNavigation, destination, routeOrigin, mapCenter]);
+  }, [routePath, showNavigation, destination, routeOrigin, userLocation]);
 
   const navigationSummary = useMemo(() => {
     if (!showNavigation || activeRoutePath.length < 2) return null;
@@ -455,35 +470,26 @@ export default function MapView({
     };
   }, [showNavigation, activeRoutePath, cctvPoints, lightingPoints, reports]);
 
-  function RecenterMap({ center }: { center: { lat: number; lng: number } }) {
-    const map = useMap();
-
-    useEffect(() => {
-      if (center && !hasRecenteredRef.current) {
-        map.setView(center, 15);
-        hasRecenteredRef.current = true;
-      }
-    }, [center, map]);
-
-    return null;
-  }
 
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer
-        center={mapCenter || { lat: -37.8136, lng: 144.9631 }}
+        center={[-37.8136, 144.9631 ]}
         zoom={11}
         style={{ height: "100%", width: "100%" }}
+        ref={mapRef}
+        zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
+
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
 
-        {mapCenter && (
+        {userLocation && (
           <>
-            <Marker position={mapCenter} icon={userIcon} />
-            <RecenterMap center={mapCenter} />
+            <Marker position={userLocation} icon={userIcon} />
           </>
         )}
         <MapEventHandler onMapClick={onMapClick} />
@@ -512,7 +518,7 @@ export default function MapView({
             return (
               <GeoJSON
                 key={geoKey}
-                data={stat.geojson}
+                data={stat.geojson as GeoJsonObject}
                 style={() => ({
                   color: "rgba(139, 0, 0, 0.5)",
                   weight: 1,
@@ -650,6 +656,14 @@ export default function MapView({
         )}
       </MapContainer>
 
+      {/* Floating Recenter Button */}
+      <div
+        onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
+        className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
+        >
+          {recenterIcon} 
+      </div>
+  
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
@@ -698,9 +712,9 @@ export default function MapView({
         </form>
       )}
 
-      <div className="absolute bottom-6 right-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
+      <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Legend
+          
         </h4>
         <div className="space-y-2 text-sm">
           {showHeatmap && (
