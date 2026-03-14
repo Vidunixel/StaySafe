@@ -1,8 +1,8 @@
-import React from 'react';
-import MapView from './components/MapView';
-import Sidebar from './components/layout/Sidebar';
-import ReportModal from './components/ReportModal';
-import { useMapState } from '../hooks/useMapState';
+import React from "react";
+import MapView from "./components/MapView";
+import Sidebar from "./components/layout/Sidebar";
+import ReportModal from "./components/ReportModal";
+import { useMapState } from "../hooks/useMapState";
 
 export type Report = {
   id: string;
@@ -19,15 +19,20 @@ export default function App() {
     showCCTV,
     showLighting,
     showReports,
+    showNavigation,
     setShowHeatmap,
     setShowCCTV,
     setShowLighting,
     setShowReports,
+    setShowNavigation,
     reports,
     reportingLocation,
+    destination,
     handleMapClick,
     submitReport,
+    clearNavigationDestination,
     setReportingLocation,
+    setDestination,
   } = useMapState();
 
   return (
@@ -41,6 +46,10 @@ export default function App() {
         setShowLighting={setShowLighting}
         showReports={showReports}
         setShowReports={setShowReports}
+        showNavigation={showNavigation}
+        setShowNavigation={setShowNavigation}
+        destination={destination}
+        clearNavigationDestination={clearNavigationDestination}
         reports={reports}
       />
 
@@ -50,7 +59,10 @@ export default function App() {
           showCCTV={showCCTV}
           showLighting={showLighting}
           showReports={showReports}
+          showNavigation={showNavigation}
           reports={reports}
+          destination={destination}
+          setDestination={setDestination}
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
         />

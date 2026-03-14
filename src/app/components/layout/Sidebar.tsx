@@ -1,6 +1,14 @@
-import React from 'react';
-import { Shield, Map as MapIcon, Video, Lightbulb, AlertTriangle, ShieldAlert } from 'lucide-react';
-import ToggleCard from '../ToggleCard';
+import React from "react";
+import {
+  Shield,
+  Map as MapIcon,
+  Video,
+  Lightbulb,
+  AlertTriangle,
+  ShieldAlert,
+  Route,
+} from "lucide-react";
+import ToggleCard from "../ToggleCard";
 
 type SidebarReport = {
   id: string;
@@ -18,6 +26,10 @@ type SidebarProps = {
   setShowLighting: React.Dispatch<React.SetStateAction<boolean>>;
   showReports: boolean;
   setShowReports: React.Dispatch<React.SetStateAction<boolean>>;
+  showNavigation: boolean;
+  setShowNavigation: React.Dispatch<React.SetStateAction<boolean>>;
+  destination: { lat: number; lng: number } | null;
+  clearNavigationDestination: () => void;
   reports: SidebarReport[];
 };
 
@@ -30,6 +42,10 @@ export default function Sidebar({
   setShowLighting,
   showReports,
   setShowReports,
+  showNavigation,
+  setShowNavigation,
+  destination,
+  clearNavigationDestination,
   reports,
 }: SidebarProps) {
   return (
@@ -39,13 +55,19 @@ export default function Sidebar({
           <Shield className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">StaySafe</h1>
-          <p className="text-xs text-slate-500 font-medium">Victoria Crime Prediction</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            StaySafe
+          </h1>
+          <p className="text-xs text-slate-500 font-medium">
+            Victoria Crime Prediction
+          </p>
         </div>
       </div>
 
       <div className="p-6 flex-1 overflow-y-auto">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Map Layers</h2>
+        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+          Map Layers
+        </h2>
 
         <div className="space-y-3">
           <ToggleCard
@@ -80,16 +102,45 @@ export default function Sidebar({
             description="Incident and safety reports"
             colorClass="text-red-600 bg-red-50 border-red-200"
           />
+          <ToggleCard
+            active={showNavigation}
+            onClick={() => setShowNavigation((prev) => !prev)}
+            icon={<Route className="w-5 h-5" />}
+            title="Safe Navigation"
+            description="Click map to set destination"
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
+          />
         </div>
+
+        {showNavigation && (
+          <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+            <p className="font-medium">Navigation is active.</p>
+            <p className="text-xs mt-1">
+              Click on the map to set a destination and view the safest route
+              estimate.
+            </p>
+            {destination && (
+              <button
+                onClick={clearNavigationDestination}
+                className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition-colors"
+              >
+                Clear Destination
+              </button>
+            )}
+          </div>
+        )}
 
         {reports.length === 0 && (
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">How to Report</h2>
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+              How to Report
+            </h2>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
               <p className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                 <span>
-                  Click anywhere on the map to drop a pin and report an incident or unsafe area.
+                  Click anywhere on the map to drop a pin and report an incident
+                  or unsafe area.
                 </span>
               </p>
             </div>
@@ -98,7 +149,9 @@ export default function Sidebar({
 
         {reports.length > 0 && (
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Recent Reports</h2>
+            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+              Recent Reports
+            </h2>
             <div className="space-y-3">
               {reports
                 .slice()
@@ -108,7 +161,9 @@ export default function Sidebar({
                     key={report.id}
                     className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm"
                   >
-                    <div className="font-semibold text-slate-800">{report.type}</div>
+                    <div className="font-semibold text-slate-800">
+                      {report.type}
+                    </div>
                     <div className="text-slate-500 text-xs mt-1 truncate">
                       {report.description}
                     </div>
@@ -124,4 +179,3 @@ export default function Sidebar({
     </aside>
   );
 }
-
