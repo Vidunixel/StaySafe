@@ -38,6 +38,7 @@ import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
 import type { Report } from "../App";
 import type { GeoJsonObject } from "geojson";
 import { geoBoundsToLatLngs } from "../../utils/geoBounds";
+import { add } from "date-fns";
 
 type LatLngTuple = [number, number];
 
@@ -55,17 +56,31 @@ L.Icon.Default.mergeOptions({
 function MapEventHandler({
   onMapClick,
   reportModeActive,
+  showNavigation,
+  setDestination,
 }: {
   onMapClick: (lat: number, lng: number) => void;
   reportModeActive: boolean;
+  showNavigation: boolean;
+  setDestination: React.Dispatch<React.SetStateAction<{ lat: number; lng: number } | null>>;
 }) {
   useMapEvents({
     click(e) {
+      const { lat, lng } = e.latlng ?? {};
+
+      if (typeof lat !== "number" || typeof lng !== "number") return;
+
+      // Handle Add Report mode
       if (reportModeActive) {
-        onMapClick(e.latlng.lat, e.latlng.lng);
+        onMapClick(lat, lng);
+      }
+      // Handle Navigation mode
+      else if (showNavigation) {
+        setDestination({ lat, lng });
       }
     },
   });
+
   return null;
 }
 
@@ -129,7 +144,7 @@ export default function MapView({
 
         if (!initialLoadDone && mapRef.current) {
           mapRef.current.setView([location.lat, location.lng], 11);
-          setInitialLoadDone(true);
+          setInitialLoadDone(true);  
         }
       },
       () => {
@@ -142,6 +157,8 @@ export default function MapView({
       }
     );
   }, []);
+
+
 
   const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
   useEffect(() => {
@@ -180,6 +197,7 @@ export default function MapView({
   const [showReportToast, setShowReportToast] = useState(false);
   const previousDraftLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const reportToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
     const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -285,7 +303,7 @@ export default function MapView({
 
     return coordinates.map(([lng, lat]) => [lat, lng] as LatLngTuple);
   }
-
+  
   useEffect(() => {
     if (!showNavigation) {
       setRouteError(null);
@@ -532,10 +550,11 @@ export default function MapView({
             <Marker position={userLocation} icon={userIcon} />
           </>
         )}
-        <MapEventHandler onMapClick={onMapClick} reportModeActive={reportModeActive} />
+        <MapEventHandler onMapClick={onMapClick} reportModeActive={reportModeActive} showNavigation={showNavigation} setDestination={setDestination}/>
 
         {/* Crime stats heatmap: Supabase crime_stats geo_bounds polygons; 10 = lightest red, 180 = darkest, transparent */}
         {showHeatmap &&
+          heatmapVisible &&
           !crimeStatsLoading &&
           crimeStats.map((stat) => {
             const heatScale = Math.max(
@@ -562,10 +581,14 @@ export default function MapView({
                 }}
                 eventHandlers={{
                   click: (e) => {
-                    if (!reportModeActive) return;
+                    if (!reportModeActive && !showNavigation) return;
                     const { lat, lng } = (e as any).latlng ?? {};
                     if (typeof lat === "number" && typeof lng === "number") {
-                      onMapClick(lat, lng);
+                      if (reportModeActive) {
+                        onMapClick(lat, lng); // report click
+                      } else if (showNavigation) {
+                        setDestination({ lat, lng }); // nav click
+                      }
                     }
                   },
                 }}
@@ -710,11 +733,11 @@ export default function MapView({
       <div
         onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
         className="absolute bottom-24 right-2 z-[400] cursor-pointer bg-white p-2 rounded-full shadow-md flex items-center justify-center hover:bg-gray-100"
-      >
-        {recenterIcon}
+        >
+          {recenterIcon} 
       </div>
 
-      <div className="absolute top-6 right-6 z-[460] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md">
+      <div className="absolute bottom-36 right-2 z-[460] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md">
         <div className="flex items-center gap-3 px-4 py-3">
           <div
             className={`h-11 w-11 rounded-xl border flex items-center justify-center transition-colors ${
@@ -752,7 +775,7 @@ export default function MapView({
           </div>
         </div>
       )}
-
+  
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
@@ -804,7 +827,7 @@ export default function MapView({
       {showHeatmap && (
         <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Risk Indicator
+          Risk Indicator 
           </h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
@@ -819,10 +842,10 @@ export default function MapView({
               <div className="w-3 h-3 rounded-full bg-cyan-500 opacity-60"></div>
               <span className="text-slate-600">Low Risk Area</span>
             </div>
-          </div>
+          </div>  
         </div>
       )}
-
+      
       {showNavigation && navigationSummary && (
         <div className="absolute top-6 right-6 z-[450] bg-white p-4 rounded-xl shadow-lg border border-emerald-100 min-w-[220px]">
           <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
