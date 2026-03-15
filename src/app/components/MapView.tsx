@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -97,6 +97,7 @@ function FitRoute({ routePath }: { routePath: LatLngTuple[] }) {
 }
 
 type MapViewProps = {
+  sidebarOpen?: boolean;
   showHeatmap: boolean;
   showCCTV: boolean;
   showLighting: boolean;
@@ -114,6 +115,7 @@ type MapViewProps = {
 };
 
 export default function MapView({
+  sidebarOpen,
   showHeatmap,
   showCCTV,
   showLighting,
@@ -202,6 +204,11 @@ export default function MapView({
   >([]);
   const [toSuggestionsOpen, setToSuggestionsOpen] = useState(false);
   const [toSuggestionsLoading, setToSuggestionsLoading] = useState(false);
+  const [selectedToSuggestion, setSelectedToSuggestion] = useState<{
+    display_name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
   const toInputContainerRef = useRef<HTMLDivElement>(null);
   const toSuggestionsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
@@ -217,16 +224,43 @@ export default function MapView({
   const reportToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  // When the map container resizes (e.g. sidebar toggle), tell Leaflet to recalculate
+  // When the map container resizes (e.g. sidebar toggle), tell Leaflet to recalculate.
+  // Debounce so we run after the sidebar's 300ms transition finishes and layout is final.
   useEffect(() => {
     const el = mapContainerRef.current;
     if (!el) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver(() => {
-      mapRef.current?.invalidateSize();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        mapRef.current?.invalidateSize();
+      }, 350);
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      ro.disconnect();
+    };
   }, []);
+
+  // When sidebar opens/closes, force reflow and map recalculate after the transition.
+  useLayoutEffect(() => {
+    const el = mapContainerRef.current;
+    const runInvalidate = () => {
+      if (el) void el.offsetHeight; // force reflow so container has correct size
+      requestAnimationFrame(() => {
+        mapRef.current?.invalidateSize();
+      });
+    };
+    runInvalidate();
+    const t1 = setTimeout(runInvalidate, 350);
+    const t2 = setTimeout(runInvalidate, 600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [sidebarOpen]);
 
   // Debounced place suggestions for "To" input
   useEffect(() => {
@@ -527,7 +561,18 @@ export default function MapView({
         return;
       }
 
-      const resolvedEnd = await geocodePlace(toValue);
+      let resolvedEnd: { lat: number; lng: number } | null = null;
+      if (
+        selectedToSuggestion &&
+        toValue === selectedToSuggestion.display_name
+      ) {
+        resolvedEnd = {
+          lat: selectedToSuggestion.lat,
+          lng: selectedToSuggestion.lng,
+        };
+      } else {
+        resolvedEnd = await geocodePlace(toValue);
+      }
       if (!resolvedEnd) {
         setRouteError("Could not find the destination.");
         return;
@@ -640,11 +685,20 @@ export default function MapView({
 
 
   return (
-    <div className="w-full h-full relative z-0">
+    <div
+      ref={mapContainerRef}
+      className="absolute inset-0 z-0"
+      style={{
+        minHeight: 0,
+        width: "100%",
+        height: "100%",
+      }}
+    >
       <MapContainer
+        key={`map-${sidebarOpen ?? true}`}
         center={[-37.8136, 144.9631 ]}
         zoom={11}
-        style={{ height: "100%", width: "100%" }}
+        style={{ height: "100%", width: "100%", minHeight: "100%" }}
         ref={mapRef}
         zoomControl={false}
       >
@@ -924,7 +978,10 @@ export default function MapView({
             <div ref={toInputContainerRef} className="relative">
               <input
                 value={toInput}
-                onChange={(event) => setToInput(event.target.value)}
+                onChange={(event) => {
+                  setToInput(event.target.value);
+                  setSelectedToSuggestion(null);
+                }}
                 onFocus={() => toSuggestions.length > 0 && setToSuggestionsOpen(true)}
                 placeholder="To (e.g. Melbourne Central)"
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -951,6 +1008,7 @@ export default function MapView({
                         className="px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 cursor-pointer truncate"
                         onClick={() => {
                           setToInput(suggestion.display_name);
+                          setSelectedToSuggestion(suggestion);
                           setToSuggestionsOpen(false);
                         }}
                       >
@@ -967,20 +1025,13 @@ export default function MapView({
             <p className="mt-2 text-xs text-red-600">{routeError}</p>
           )}
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3">
             <button
               type="submit"
               disabled={isFindingRoute}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               {isFindingRoute ? "Finding…" : "Get Route"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setFromInput("Current location")}
-              className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-colors"
-            >
-              Use Me
             </button>
           </div>
         </form>

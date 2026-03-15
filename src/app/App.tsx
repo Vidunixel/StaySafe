@@ -138,8 +138,16 @@ export default function App() {
         />
       </div>
 
-      <main className="flex-1 min-w-0 relative transition-[flex] duration-300 ease-in-out">
+      <main
+        className="min-h-0 h-full relative overflow-hidden"
+        style={{
+          flex: "1 1 0%",
+          minWidth: 0,
+          width: sidebarOpen ? undefined : "100%",
+        }}
+      >
         <MapView
+          sidebarOpen={sidebarOpen}
           showHeatmap={showHeatmap}
           showCCTV={showCCTV}
           showLighting={showLighting}
