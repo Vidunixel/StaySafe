@@ -66,7 +66,7 @@ export default function Sidebar({
 
   const [safetyOpen, setSafetyOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
-  const [navigationOpen, setNavigationOpen] = useState(true);
+  const [navigationOpen, setNavigationOpen] = useState(false);
 
   return (
     <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-lg relative">
