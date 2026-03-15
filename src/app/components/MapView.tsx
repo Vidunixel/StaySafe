@@ -186,6 +186,13 @@ export default function MapView({
 
   const [fromInput, setFromInput] = useState("Current location");
   const [toInput, setToInput] = useState("");
+  const [toSuggestions, setToSuggestions] = useState<
+    Array<{ display_name: string; lat: number; lng: number }>
+  >([]);
+  const [toSuggestionsOpen, setToSuggestionsOpen] = useState(false);
+  const [toSuggestionsLoading, setToSuggestionsLoading] = useState(false);
+  const toInputContainerRef = useRef<HTMLDivElement>(null);
+  const toSuggestionsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
   const [routeOrigin, setRouteOrigin] = useState<{
     lat: number;
@@ -209,6 +216,56 @@ export default function MapView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Debounced place suggestions for "To" input
+  useEffect(() => {
+    if (toSuggestionsDebounceRef.current) {
+      clearTimeout(toSuggestionsDebounceRef.current);
+      toSuggestionsDebounceRef.current = null;
+    }
+    const trimmed = toInput.trim();
+    if (trimmed.length < 2) {
+      setToSuggestions([]);
+      setToSuggestionsOpen(false);
+      return;
+    }
+    setToSuggestionsOpen(true);
+    setToSuggestionsLoading(true);
+    toSuggestionsDebounceRef.current = setTimeout(() => {
+      toSuggestionsDebounceRef.current = null;
+      fetchPlaceSuggestions(trimmed)
+        .then((list) => {
+          setToSuggestions(list);
+          if (list.length === 0) setToSuggestionsOpen(false);
+        })
+        .catch(() => {
+          setToSuggestions([]);
+          setToSuggestionsOpen(false);
+        })
+        .finally(() => setToSuggestionsLoading(false));
+    }, 300);
+    return () => {
+      if (toSuggestionsDebounceRef.current) {
+        clearTimeout(toSuggestionsDebounceRef.current);
+      }
+    };
+  }, [toInput]);
+
+  // Close suggestions when clicking outside the To input container
+  useEffect(() => {
+    if (!toSuggestionsOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        toInputContainerRef.current &&
+        !toInputContainerRef.current.contains(e.target as Node)
+      ) {
+        setToSuggestionsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [toSuggestionsOpen]);
+
   const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
@@ -272,6 +329,36 @@ export default function MapView({
       lat: Number(results[0].lat),
       lng: Number(results[0].lon),
     };
+  }
+
+  async function fetchPlaceSuggestions(
+    query: string,
+  ): Promise<Array<{ display_name: string; lat: number; lng: number }>> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const scopedQuery = `${trimmed}, Melbourne, Victoria, Australia`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(scopedQuery)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "StaySafe-Victoria-Crime-Prediction/1.0",
+      },
+    });
+
+    if (!response.ok) return [];
+
+    const results = (await response.json()) as Array<{
+      display_name: string;
+      lat: string;
+      lon: string;
+    }>;
+
+    return results.map((r) => ({
+      display_name: r.display_name,
+      lat: Number(r.lat),
+      lng: Number(r.lon),
+    }));
   }
 
   function getReportCoordinates(report: Report): LatLngTuple | null {
@@ -793,12 +880,46 @@ export default function MapView({
               placeholder="From (default: current location)"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-            <input
-              value={toInput}
-              onChange={(event) => setToInput(event.target.value)}
-              placeholder="To (e.g. Melbourne Central)"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <div ref={toInputContainerRef} className="relative">
+              <input
+                value={toInput}
+                onChange={(event) => setToInput(event.target.value)}
+                onFocus={() => toSuggestions.length > 0 && setToSuggestionsOpen(true)}
+                placeholder="To (e.g. Melbourne Central)"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                autoComplete="off"
+              />
+              {toSuggestionsOpen && (
+                <ul
+                  className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg z-[500] py-1"
+                  role="listbox"
+                >
+                  {toSuggestionsLoading ? (
+                    <li className="px-3 py-2 text-sm text-slate-500">
+                      Searching…
+                    </li>
+                  ) : toSuggestions.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-slate-500">
+                      No places found
+                    </li>
+                  ) : (
+                    toSuggestions.map((suggestion, idx) => (
+                      <li
+                        key={`${suggestion.lat}-${suggestion.lng}-${idx}`}
+                        role="option"
+                        className="px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 cursor-pointer truncate"
+                        onClick={() => {
+                          setToInput(suggestion.display_name);
+                          setToSuggestionsOpen(false);
+                        }}
+                      >
+                        {suggestion.display_name}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+            </div>
           </div>
 
           {routeError && (
