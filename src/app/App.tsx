@@ -187,6 +187,7 @@ export default function App() {
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
           reportsLoading={reportsLoading}
+          mapRef={mapRef}
         />
 
         {reportingLocation && (
