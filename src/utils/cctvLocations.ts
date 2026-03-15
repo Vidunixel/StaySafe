@@ -1,4 +1,8 @@
-import { supabase } from "../lib/supabase";
+import {
+  fetchAllRows,
+  getDefaultCacheTtlMs,
+  loadWithCache,
+} from "../lib/dataLoader";
 
 type CctvRow = {
   geo_coordinates: unknown;
@@ -17,20 +21,19 @@ function parseGeoCoordinates(value: unknown): [number, number] | null {
  */
 export async function loadCctvLocations(): Promise<[number, number][]> {
   try {
-    const { data, error } = await supabase
-      .from("cctv_locations")
-      .select("geo_coordinates")
-      .not("geo_coordinates", "is", null);
-
-    if (error) {
-      console.warn("Could not load cctv_locations:", error.message);
-      return [];
-    }
-
-    const rows = (data ?? []) as CctvRow[];
-    return rows
-      .map((row) => parseGeoCoordinates(row.geo_coordinates))
-      .filter((point): point is [number, number] => point !== null);
+    return await loadWithCache(
+      "cctv_locations.all_points",
+      async () => {
+        const rows = await fetchAllRows<CctvRow>(
+          "cctv_locations",
+          "geo_coordinates",
+        );
+        return rows
+          .map((row) => parseGeoCoordinates(row.geo_coordinates))
+          .filter((point): point is [number, number] => point !== null);
+      },
+      getDefaultCacheTtlMs(),
+    );
   } catch (e) {
     console.warn("Could not load cctv_locations", e);
     return [];

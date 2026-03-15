@@ -1,4 +1,8 @@
-import { supabase } from "../lib/supabase";
+import {
+  fetchAllRows,
+  getDefaultCacheTtlMs,
+  loadWithCache,
+} from "../lib/dataLoader";
 
 export type PedestrianSegment = [number, number][];
 export type PedestrianPoint = [number, number];
@@ -47,16 +51,15 @@ export async function loadPedestrianNetwork(
   maxSegments: number = 3000,
 ): Promise<PedestrianNetworkData> {
   try {
-    const { data, error } = await supabase
-      .from("pedestrian_network")
-      .select("type, geo_bounds, geo_coordinates");
-
-    if (error) {
-      console.warn("Could not load pedestrian_network:", error.message);
-      return { segments: [], points: [] };
-    }
-
-    const rows = (data ?? []) as PedestrianRow[];
+    const rows = await loadWithCache(
+      "pedestrian_network.all_rows",
+      () =>
+        fetchAllRows<PedestrianRow>(
+          "pedestrian_network",
+          "type, geo_bounds, geo_coordinates",
+        ),
+      getDefaultCacheTtlMs(),
+    );
     const points: PedestrianPoint[] = [];
     const allSegments: PedestrianSegment[] = [];
 

@@ -4,6 +4,7 @@ import Sidebar from "./components/layout/Sidebar";
 import ReportModal from "./components/ReportModal";
 import { useMapState, type ReportFormValues } from "../hooks/useMapState";
 import { supabase } from "../lib/supabase";
+import { fetchAllRows } from "../lib/dataLoader";
 import { Button } from "./components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
@@ -40,41 +41,53 @@ export default function App() {
   } = useMapState();
 
   const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const fetchReports = async () => {
-    const { data, error } = await supabase
-      .from("reports")
-      .select("id, geo_coordinates, incident_type, description, created_at");
-    if (error) return;
-    const rows = (data ?? []) as Array<{
-      id: string;
-      geo_coordinates: number[] | unknown;
-      incident_type: string;
-      description: string;
-      created_at: string;
-    }>;
-    const normalized: Report[] = rows
-      .filter((row) => {
-        const coords = row.geo_coordinates;
-        return (
-          Array.isArray(coords) &&
-          coords.length >= 2 &&
-          coords.every((value) => typeof value === "number")
-        );
-      })
-      .map((row) => ({
-        id: row.id,
-        geo_coordinates: row.geo_coordinates as number[],
-        incident_type: row.incident_type,
-        description: row.description ?? "",
-        created_at: row.created_at ?? new Date().toISOString(),
-      }));
-    setReports(normalized);
+    setReportsLoading(true);
+    try {
+      const rows = await fetchAllRows<{
+        id: string;
+        geo_coordinates: number[] | unknown;
+        incident_type: string;
+        description: string;
+        created_at: string;
+      }>(
+        "reports",
+        "id, geo_coordinates, incident_type, description, created_at",
+      );
+      const normalized: Report[] = rows
+        .filter((row) => {
+          const coords = row.geo_coordinates;
+          return (
+            Array.isArray(coords) &&
+            coords.length >= 2 &&
+            !Number.isNaN(Number(coords[0])) &&
+            !Number.isNaN(Number(coords[1]))
+          );
+        })
+        .map((row) => ({
+          id: row.id,
+          geo_coordinates: [
+            Number((row.geo_coordinates as number[])[0]),
+            Number((row.geo_coordinates as number[])[1]),
+          ],
+          incident_type: row.incident_type,
+          description: row.description ?? "",
+          created_at: row.created_at ?? new Date().toISOString(),
+        }));
+      setReports(normalized);
+    } catch (error) {
+      console.warn("Could not load reports", error);
+      setReports([]);
+    } finally {
+      setReportsLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchReports();
+    void fetchReports();
   }, []);
 
   const submitReport = async (data: ReportFormValues) => {
@@ -160,6 +173,7 @@ export default function App() {
           setDestination={setDestination}
           onMapClick={handleMapClick}
           draftLocation={reportingLocation}
+          reportsLoading={reportsLoading}
         />
 
         {reportingLocation && (

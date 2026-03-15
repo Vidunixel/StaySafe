@@ -1,4 +1,8 @@
-import { supabase } from "../lib/supabase";
+import {
+  fetchAllRows,
+  getDefaultCacheTtlMs,
+  loadWithCache,
+} from "../lib/dataLoader";
 
 export type PoliceStation = {
   position: [number, number];
@@ -24,19 +28,19 @@ function parseStation(row: PoliceStationRow): PoliceStation | null {
  */
 export async function loadPoliceStations(): Promise<PoliceStation[]> {
   try {
-    const { data, error } = await supabase
-      .from("police_stations")
-      .select("geo_coordinates")
-      .not("geo_coordinates", "is", null);
-
-    if (error) {
-      console.warn("Could not load police_stations:", error.message);
-      return [];
-    }
-
-    return ((data ?? []) as PoliceStationRow[])
-      .map(parseStation)
-      .filter((station): station is PoliceStation => station !== null);
+    return await loadWithCache(
+      "police_stations.all_points",
+      async () => {
+        const rows = await fetchAllRows<PoliceStationRow>(
+          "police_stations",
+          "geo_coordinates",
+        );
+        return rows
+          .map(parseStation)
+          .filter((station): station is PoliceStation => station !== null);
+      },
+      getDefaultCacheTtlMs(),
+    );
   } catch (e) {
     console.warn("Could not load police_stations", e);
     return [];

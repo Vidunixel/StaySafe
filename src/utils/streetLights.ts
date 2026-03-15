@@ -1,4 +1,8 @@
-import { supabase } from "../lib/supabase";
+import {
+  fetchAllRows,
+  getDefaultCacheTtlMs,
+  loadWithCache,
+} from "../lib/dataLoader";
 
 type StreetLightRow = {
   geo_coordinates: unknown;
@@ -19,19 +23,19 @@ export async function loadStreetLights(
   maxPoints: number = 2000,
 ): Promise<[number, number][]> {
   try {
-    const { data, error } = await supabase
-      .from("street_lights")
-      .select("geo_coordinates")
-      .not("geo_coordinates", "is", null);
-
-    if (error) {
-      console.warn("Could not load street_lights:", error.message);
-      return [];
-    }
-
-    const allPoints = ((data ?? []) as StreetLightRow[])
-      .map((row) => parseGeoCoordinates(row.geo_coordinates))
-      .filter((point): point is [number, number] => point !== null);
+    const allPoints = await loadWithCache(
+      "street_lights.all_points",
+      async () => {
+        const rows = await fetchAllRows<StreetLightRow>(
+          "street_lights",
+          "geo_coordinates",
+        );
+        return rows
+          .map((row) => parseGeoCoordinates(row.geo_coordinates))
+          .filter((point): point is [number, number] => point !== null);
+      },
+      getDefaultCacheTtlMs(),
+    );
 
     if (allPoints.length === 0) return [];
     if (allPoints.length <= maxPoints) return allPoints;

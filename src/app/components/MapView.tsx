@@ -98,6 +98,7 @@ function FitRoute({ routePath }: { routePath: LatLngTuple[] }) {
 
 type MapViewProps = {
   sidebarOpen?: boolean;
+  reportsLoading: boolean;
   showHeatmap: boolean;
   showCCTV: boolean;
   showLighting: boolean;
@@ -116,6 +117,7 @@ type MapViewProps = {
 
 export default function MapView({
   sidebarOpen,
+  reportsLoading,
   showHeatmap,
   showCCTV,
   showLighting,
@@ -174,32 +176,101 @@ export default function MapView({
   };
 
   const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
+  const [cctvLoading, setCctvLoading] = useState(true);
   useEffect(() => {
-    loadCctvLocations().then(setCctvPoints);
+    let cancelled = false;
+    setCctvLoading(true);
+    loadCctvLocations()
+      .then((points) => {
+        if (!cancelled) setCctvPoints(points);
+      })
+      .finally(() => {
+        if (!cancelled) setCctvLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [lightingPoints, setLightingPoints] = useState<[number, number][]>([]);
+  const [lightingLoading, setLightingLoading] = useState(true);
   useEffect(() => {
-    loadStreetLights(2000).then(setLightingPoints);
+    let cancelled = false;
+    setLightingLoading(true);
+    loadStreetLights(2000)
+      .then((points) => {
+        if (!cancelled) setLightingPoints(points);
+      })
+      .finally(() => {
+        if (!cancelled) setLightingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [policeStations, setPoliceStations] = useState<
     Array<{ position: [number, number]; name: string }>
   >([]);
+  const [policeLoading, setPoliceLoading] = useState(true);
   useEffect(() => {
-    loadPoliceStations().then(setPoliceStations);
+    let cancelled = false;
+    setPoliceLoading(true);
+    loadPoliceStations()
+      .then((stations) => {
+        if (!cancelled) setPoliceStations(stations);
+      })
+      .finally(() => {
+        if (!cancelled) setPoliceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [pedestrianSegments, setPedestrianSegments] = useState<
     [number, number][][]
   >([]);
   const [pedestrianPoints, setPedestrianPoints] = useState<[number, number][]>([]);
+  const [pedestrianLoading, setPedestrianLoading] = useState(true);
   useEffect(() => {
-    loadPedestrianNetwork(3000).then((network) => {
-      setPedestrianSegments(network.segments);
-      setPedestrianPoints(network.points);
-    });
+    let cancelled = false;
+    setPedestrianLoading(true);
+    loadPedestrianNetwork(3000)
+      .then((network) => {
+        if (!cancelled) {
+          setPedestrianSegments(network.segments);
+          setPedestrianPoints(network.points);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPedestrianLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const [showStartupLoader, setShowStartupLoader] = useState(true);
+  const startupLoadState = {
+    reports: reportsLoading,
+    crimeStats: crimeStatsLoading,
+    cctv: cctvLoading,
+    streetLights: lightingLoading,
+    policeStations: policeLoading,
+    pedestrianNetwork: pedestrianLoading,
+  };
+  const startupTaskCount = Object.keys(startupLoadState).length;
+  const startupPendingCount = Object.values(startupLoadState).filter(Boolean).length;
+  const startupLoadedCount = startupTaskCount - startupPendingCount;
+  const startupProgress = Math.round((startupLoadedCount / startupTaskCount) * 100);
+  const startupLoading = showStartupLoader && startupPendingCount > 0;
+
+  useEffect(() => {
+    if (showStartupLoader && startupPendingCount === 0) {
+      setShowStartupLoader(false);
+    }
+  }, [showStartupLoader, startupPendingCount]);
 
   const [fromInput, setFromInput] = useState("Current location");
   const [toInput, setToInput] = useState("");
@@ -950,6 +1021,25 @@ export default function MapView({
           </Marker>
         )}
       </MapContainer>
+
+      {startupLoading && (
+        <div className="absolute inset-0 z-[700] bg-white/90 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-[min(420px,80vw)] rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-slate-800 mb-2">
+              Loading map data
+            </p>
+            <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-300 ease-out"
+                style={{ width: `${startupProgress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {startupLoadedCount}/{startupTaskCount} datasets ready
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Floating Recenter Button */}
       <div

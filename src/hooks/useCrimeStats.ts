@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "../lib/supabase";
+import {
+  fetchAllRows,
+  getDefaultCacheTtlMs,
+  loadWithCache,
+} from "../lib/dataLoader";
 
 type CrimeStatRow = {
   id: string;
@@ -27,15 +31,15 @@ export function useCrimeStats() {
       setError(null);
 
       try {
-        const { data: rows, error: fetchError } = await supabase
-          .from("crime_stats")
-          .select("id, local_gov_area, avg_rate_per_100k, geo_bounds");
-
-        if (fetchError) {
-          throw fetchError;
-        }
-
-        const stats = (rows ?? []) as CrimeStatRow[];
+        const stats = await loadWithCache(
+          "crime_stats.all_rows",
+          () =>
+            fetchAllRows<CrimeStatRow>(
+              "crime_stats",
+              "id, local_gov_area, avg_rate_per_100k, geo_bounds",
+            ),
+          getDefaultCacheTtlMs(),
+        );
         setData(
           stats.map((stat) => ({
             id: stat.id,

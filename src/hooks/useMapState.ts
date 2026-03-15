@@ -30,7 +30,7 @@ export function useMapState() {
   const [showLighting, setShowLighting] = useState(false);
   const [showReports, setShowReports] = useState(true);
   const [showNavigation, setShowNavigation] = useState(false);
-  const [showPoliceStations, setShowPoliceStations] = useState(true);
+  const [showPoliceStations, setShowPoliceStations] = useState(false);
   const [showPedestrianNetwork, setShowPedestrianNetwork] = useState(false);
 
   const [reportingLocation, setReportingLocation] =
