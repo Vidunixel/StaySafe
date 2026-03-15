@@ -128,6 +128,11 @@ export default function MapView({
   setDestination,
 }: MapViewProps) {
   const { data: crimeStats, isLoading: crimeStatsLoading, maxAvgRate } = useCrimeStats();
+  const crimeRateRange = useMemo(() => {
+    if (crimeStats.length === 0) return { min: 0, max: 1 };
+    const rates = crimeStats.map((s) => s.avg_rate_per_100k);
+    return { min: Math.min(...rates), max: Math.max(...rates) };
+  }, [crimeStats]);
   const hasRecenteredRef = useRef(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -158,7 +163,13 @@ export default function MapView({
     );
   }, []);
 
+  const zoomToLocation = (lat: number, lng: number) => {
+    if (!mapRef.current) return;
 
+    mapRef.current.flyTo([lat, lng], 15, {
+      duration: 0.8,
+    });
+  };
 
   const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
   useEffect(() => {
@@ -190,6 +201,13 @@ export default function MapView({
 
   const [fromInput, setFromInput] = useState("Current location");
   const [toInput, setToInput] = useState("");
+  const [toSuggestions, setToSuggestions] = useState<
+    Array<{ display_name: string; lat: number; lng: number }>
+  >([]);
+  const [toSuggestionsOpen, setToSuggestionsOpen] = useState(false);
+  const [toSuggestionsLoading, setToSuggestionsLoading] = useState(false);
+  const toInputContainerRef = useRef<HTMLDivElement>(null);
+  const toSuggestionsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
   const [routeOrigin, setRouteOrigin] = useState<{
     lat: number;
@@ -213,6 +231,56 @@ export default function MapView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Debounced place suggestions for "To" input
+  useEffect(() => {
+    if (toSuggestionsDebounceRef.current) {
+      clearTimeout(toSuggestionsDebounceRef.current);
+      toSuggestionsDebounceRef.current = null;
+    }
+    const trimmed = toInput.trim();
+    if (trimmed.length < 2) {
+      setToSuggestions([]);
+      setToSuggestionsOpen(false);
+      return;
+    }
+    setToSuggestionsOpen(true);
+    setToSuggestionsLoading(true);
+    toSuggestionsDebounceRef.current = setTimeout(() => {
+      toSuggestionsDebounceRef.current = null;
+      fetchPlaceSuggestions(trimmed)
+        .then((list) => {
+          setToSuggestions(list);
+          if (list.length === 0) setToSuggestionsOpen(false);
+        })
+        .catch(() => {
+          setToSuggestions([]);
+          setToSuggestionsOpen(false);
+        })
+        .finally(() => setToSuggestionsLoading(false));
+    }, 300);
+    return () => {
+      if (toSuggestionsDebounceRef.current) {
+        clearTimeout(toSuggestionsDebounceRef.current);
+      }
+    };
+  }, [toInput]);
+
+  // Close suggestions when clicking outside the To input container
+  useEffect(() => {
+    if (!toSuggestionsOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        toInputContainerRef.current &&
+        !toInputContainerRef.current.contains(e.target as Node)
+      ) {
+        setToSuggestionsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [toSuggestionsOpen]);
+
   const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
@@ -276,6 +344,36 @@ export default function MapView({
       lat: Number(results[0].lat),
       lng: Number(results[0].lon),
     };
+  }
+
+  async function fetchPlaceSuggestions(
+    query: string,
+  ): Promise<Array<{ display_name: string; lat: number; lng: number }>> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    const scopedQuery = `${trimmed}, Melbourne, Victoria, Australia`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(scopedQuery)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "StaySafe-Victoria-Crime-Prediction/1.0",
+      },
+    });
+
+    if (!response.ok) return [];
+
+    const results = (await response.json()) as Array<{
+      display_name: string;
+      lat: string;
+      lon: string;
+    }>;
+
+    return results.map((r) => ({
+      display_name: r.display_name,
+      lat: Number(r.lat),
+      lng: Number(r.lon),
+    }));
   }
 
   function getReportCoordinates(report: Report): LatLngTuple | null {
@@ -546,7 +644,7 @@ export default function MapView({
 
 
   return (
-    <div ref={mapContainerRef} className="w-full h-full relative z-0">
+    <div className="w-full h-full relative z-0">
       <MapContainer
         center={[-37.8136, 144.9631 ]}
         zoom={11}
@@ -568,18 +666,18 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} reportModeActive={reportModeActive} showNavigation={showNavigation} setDestination={setDestination}/>
 
-        {/* Crime stats heatmap: Supabase crime_stats geo_bounds polygons; 10 = lightest red, 180 = darkest, transparent */}
+        {/* Crime stats heatmap: green (low) → yellow (medium) → red (high) */}
         {showHeatmap &&
           heatmapVisible &&
           !crimeStatsLoading &&
           crimeStats.map((stat) => {
-            const heatScale = Math.max(
-              0,
-              Math.min(1, (stat.avg_rate_per_100k - 10) / (180 - 10)),
-            );
-            const lightness = 92 - heatScale * 62;
-            const fillColor = `hsl(0, 75%, ${lightness}%)`;
-            const fillOpacity = 0.35 + heatScale * 0.25;
+            const { min, max } = crimeRateRange;
+            const range = max - min || 1;
+            const t = (stat.avg_rate_per_100k - min) / range;
+            const heatScale = Math.max(0, Math.min(1, 0.38 + 0.62 * t));
+            const hue = 120 * (1 - heatScale);
+            const fillColor = `hsl(${hue}, 75%, 52%)`;
+            const fillOpacity = 0.4 + heatScale * 0.2;
             const positions = geoBoundsToLatLngs(
               (stat as { geo_bounds?: unknown }).geo_bounds,
             );
@@ -590,7 +688,7 @@ export default function MapView({
                 key={stat.id}
                 positions={positions as any}
                 pathOptions={{
-                  color: "rgba(139, 0, 0, 0.5)",
+                  color: "rgba(0, 0, 0, 0.25)",
                   weight: 1,
                   fillColor,
                   fillOpacity,
@@ -628,7 +726,15 @@ export default function MapView({
 
         {showCCTV &&
           cctvPoints.map((point, idx) => (
-            <Marker key={`cctv-${idx}`} position={point} icon={cctvIcon}>
+            <Marker
+            key={`cctv-${idx}`}
+            position={point}
+            icon={cctvIcon}
+            eventHandlers={{
+              click: () => {
+                zoomToLocation(point[0], point[1]);
+              },
+            }}>
               <Popup>
                 <div className="font-sans text-xs">
                   <span className="font-semibold text-blue-700 block mb-1">
@@ -671,7 +777,16 @@ export default function MapView({
             if (!coordinates) return null;
 
             return (
-              <Marker key={report.id} position={coordinates} icon={reportIcon}>
+              <Marker
+                key={report.id}
+                position={coordinates}
+                icon={reportIcon}
+                eventHandlers={{
+                  click: () => {
+                    zoomToLocation(coordinates[0], coordinates[1]);
+                  },
+                }}
+                >
                 <Popup>
                   <div className="font-sans min-w-[200px]">
                     <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
@@ -698,6 +813,11 @@ export default function MapView({
               key={`police-${idx}`}
               position={station.position}
               icon={policeStationIcon}
+              eventHandlers={{
+                click: () => {
+                  zoomToLocation(station.position[0], station.position[1]);
+                },
+              }}
             >
               <Popup>
                 <div className="font-sans text-xs">
@@ -829,12 +949,46 @@ export default function MapView({
               placeholder="From (default: current location)"
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-            <input
-              value={toInput}
-              onChange={(event) => setToInput(event.target.value)}
-              placeholder="To (e.g. Melbourne Central)"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <div ref={toInputContainerRef} className="relative">
+              <input
+                value={toInput}
+                onChange={(event) => setToInput(event.target.value)}
+                onFocus={() => toSuggestions.length > 0 && setToSuggestionsOpen(true)}
+                placeholder="To (e.g. Melbourne Central)"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                autoComplete="off"
+              />
+              {toSuggestionsOpen && (
+                <ul
+                  className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg z-[500] py-1"
+                  role="listbox"
+                >
+                  {toSuggestionsLoading ? (
+                    <li className="px-3 py-2 text-sm text-slate-500">
+                      Searching…
+                    </li>
+                  ) : toSuggestions.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-slate-500">
+                      No places found
+                    </li>
+                  ) : (
+                    toSuggestions.map((suggestion, idx) => (
+                      <li
+                        key={`${suggestion.lat}-${suggestion.lng}-${idx}`}
+                        role="option"
+                        className="px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 cursor-pointer truncate"
+                        onClick={() => {
+                          setToInput(suggestion.display_name);
+                          setToSuggestionsOpen(false);
+                        }}
+                      >
+                        {suggestion.display_name}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+            </div>
           </div>
 
           {routeError && (
@@ -863,22 +1017,20 @@ export default function MapView({
       {showHeatmap && (
         <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Risk Indicator 
+            Risk Indicator
           </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-violet-500 opacity-60"></div>
-              <span className="text-slate-600">High Risk Area</span>
+          <div className="flex flex-col gap-1.5">
+            <div
+              className="h-3 w-32 rounded-md border border-slate-200"
+              style={{
+                background: "linear-gradient(to right, hsl(120, 75%, 45%), hsl(60, 75%, 55%), hsl(0, 75%, 45%))",
+              }}
+            />
+            <div className="flex justify-between text-xs text-slate-600 w-32">
+              <span>Low</span>
+              <span>High</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-fuchsia-500 opacity-60"></div>
-              <span className="text-slate-600">Medium Risk Area</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-cyan-500 opacity-60"></div>
-              <span className="text-slate-600">Low Risk Area</span>
-            </div>
-          </div>  
+          </div>
         </div>
       )}
       
