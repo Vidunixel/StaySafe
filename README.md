@@ -36,7 +36,7 @@
   - Additional data and model improvements planned
 
   # Live Demo
-  https://stay-safe-blush.vercel.app/
+  [https://stay-safe-blush.vercel.app/](https://stay-safe-vic.vercel.app/)
 
   ## Running the code locally 
 
