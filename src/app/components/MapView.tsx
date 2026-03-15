@@ -128,6 +128,11 @@ export default function MapView({
   setDestination,
 }: MapViewProps) {
   const { data: crimeStats, isLoading: crimeStatsLoading, maxAvgRate } = useCrimeStats();
+  const crimeRateRange = useMemo(() => {
+    if (crimeStats.length === 0) return { min: 0, max: 1 };
+    const rates = crimeStats.map((s) => s.avg_rate_per_100k);
+    return { min: Math.min(...rates), max: Math.max(...rates) };
+  }, [crimeStats]);
   const hasRecenteredRef = useRef(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -657,18 +662,18 @@ export default function MapView({
         )}
         <MapEventHandler onMapClick={onMapClick} reportModeActive={reportModeActive} showNavigation={showNavigation} setDestination={setDestination}/>
 
-        {/* Crime stats heatmap: Supabase crime_stats geo_bounds polygons; 10 = lightest red, 180 = darkest, transparent */}
+        {/* Crime stats heatmap: green (low) → yellow (medium) → red (high) */}
         {showHeatmap &&
           heatmapVisible &&
           !crimeStatsLoading &&
           crimeStats.map((stat) => {
-            const heatScale = Math.max(
-              0,
-              Math.min(1, (stat.avg_rate_per_100k - 10) / (180 - 10)),
-            );
-            const lightness = 92 - heatScale * 62;
-            const fillColor = `hsl(0, 75%, ${lightness}%)`;
-            const fillOpacity = 0.35 + heatScale * 0.25;
+            const { min, max } = crimeRateRange;
+            const range = max - min || 1;
+            const t = (stat.avg_rate_per_100k - min) / range;
+            const heatScale = Math.max(0, Math.min(1, 0.38 + 0.62 * t));
+            const hue = 120 * (1 - heatScale);
+            const fillColor = `hsl(${hue}, 75%, 52%)`;
+            const fillOpacity = 0.4 + heatScale * 0.2;
             const positions = geoBoundsToLatLngs(
               (stat as { geo_bounds?: unknown }).geo_bounds,
             );
@@ -679,7 +684,7 @@ export default function MapView({
                 key={stat.id}
                 positions={positions as any}
                 pathOptions={{
-                  color: "rgba(139, 0, 0, 0.5)",
+                  color: "rgba(0, 0, 0, 0.25)",
                   weight: 1,
                   fillColor,
                   fillOpacity,
@@ -984,22 +989,20 @@ export default function MapView({
       {showHeatmap && (
         <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Risk Indicator 
+            Risk Indicator
           </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-violet-500 opacity-60"></div>
-              <span className="text-slate-600">High Risk Area</span>
+          <div className="flex flex-col gap-1.5">
+            <div
+              className="h-3 w-32 rounded-md border border-slate-200"
+              style={{
+                background: "linear-gradient(to right, hsl(120, 75%, 45%), hsl(60, 75%, 55%), hsl(0, 75%, 45%))",
+              }}
+            />
+            <div className="flex justify-between text-xs text-slate-600 w-32">
+              <span>Low</span>
+              <span>High</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-fuchsia-500 opacity-60"></div>
-              <span className="text-slate-600">Medium Risk Area</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-cyan-500 opacity-60"></div>
-              <span className="text-slate-600">Low Risk Area</span>
-            </div>
-          </div>  
+          </div>
         </div>
       )}
       
