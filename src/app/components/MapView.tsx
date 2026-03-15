@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect,useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   cctvIcon,
+  lightingIcon,
   reportIcon,
   draftIcon,
   userIcon,
@@ -39,6 +40,7 @@ import type { Report } from "../App";
 import type { GeoJsonObject } from "geojson";
 import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 import { add } from "date-fns";
+import { Map as LeafletMap } from 'leaflet';
 
 type LatLngTuple = [number, number];
 
@@ -84,6 +86,26 @@ function MapEventHandler({
   return null;
 }
 
+function MapRefHandler({ mapRef }: { mapRef: React.RefObject<LeafletMap | null> }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (map && mapRef) {
+      mapRef.current = map;
+      console.log("Map ref set:", map);
+    }
+    
+    return () => {
+      if (mapRef) {
+        mapRef.current = null;
+      }
+    };
+  }, [map, mapRef]);
+  
+  return null;
+}
+
+
 function FitRoute({ routePath }: { routePath: LatLngTuple[] }) {
   const map = useMap();
 
@@ -112,6 +134,7 @@ type MapViewProps = {
   setDestination: React.Dispatch<
     React.SetStateAction<{ lat: number; lng: number } | null>
   >;
+  mapRef: React.RefObject<LeafletMap | null>;
 };
 
 export default function MapView({
@@ -128,7 +151,9 @@ export default function MapView({
   draftLocation,
   destination,
   setDestination,
+  mapRef,
 }: MapViewProps) {
+  
   const { data: crimeStats, isLoading: crimeStatsLoading, maxAvgRate } = useCrimeStats();
   const crimeRateRange = useMemo(() => {
     if (crimeStats.length === 0) return { min: 0, max: 1 };
@@ -138,7 +163,7 @@ export default function MapView({
   const hasRecenteredRef = useRef(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const mapRef = useRef<L.Map | null>(null);
+  // const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -238,7 +263,7 @@ export default function MapView({
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
-        mapRef.current?.invalidateSize();
+      mapRef.current?.invalidateSize();
       }, 350);
     });
     ro.observe(el);
@@ -707,6 +732,7 @@ export default function MapView({
         zoomControl={false}
       >
         <ZoomControl position="bottomright" />
+        <MapRefHandler mapRef={mapRef} />
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -780,9 +806,9 @@ export default function MapView({
 
         {showCCTV &&
           cctvPoints.map((point, idx) => (
-            <Marker
-            key={`cctv-${idx}`}
-            position={point}
+            <Marker 
+            key={`cctv-${idx}`} 
+            position={point} 
             icon={cctvIcon}
             eventHandlers={{
               click: () => {
@@ -802,10 +828,15 @@ export default function MapView({
 
         {showLighting &&
           lightingPoints.map((point, idx) => (
-            <CircleMarker
-              key={`light-${idx}`}
-              center={point}
-              radius={4}
+            <CircleMarker 
+            key={`light-${idx}`} 
+            center={point} 
+            radius={4}       
+            eventHandlers={{
+              click: () => {
+                zoomToLocation(point[0], point[1]);
+              },
+            }}            
               pathOptions={{
                 color: "#ca8a04",
                 fillColor: "#facc15",
@@ -831,9 +862,9 @@ export default function MapView({
             if (!coordinates) return null;
 
             return (
-              <Marker
-                key={report.id}
-                position={coordinates}
+              <Marker 
+                key={report.id}          
+                position={coordinates} 
                 icon={reportIcon}
                 eventHandlers={{
                   click: () => {
@@ -866,7 +897,7 @@ export default function MapView({
             <Marker
               key={`police-${idx}`}
               position={station.position}
-              icon={policeStationIcon}
+              icon={policeStationIcon}      
               eventHandlers={{
                 click: () => {
                   zoomToLocation(station.position[0], station.position[1]);
@@ -1053,13 +1084,20 @@ export default function MapView({
             <p className="mt-2 text-xs text-red-600">{routeError}</p>
           )}
 
-          <div className="mt-3">
+          <div className="mt-3 flex gap-2">
             <button
               type="submit"
               disabled={isFindingRoute}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="w-full flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               {isFindingRoute ? "Finding…" : "Get Route"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFromInput("Current location")}
+              className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm rounded-lg transition-colors"
+            >
+              Use Me
             </button>
           </div>
         </form>

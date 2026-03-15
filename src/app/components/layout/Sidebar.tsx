@@ -58,7 +58,10 @@ export default function Sidebar({
   showPedestrianNetwork,
   setShowPedestrianNetwork,
   reports,
-}: SidebarProps) {
+  onReportClick,
+}: SidebarProps & { 
+  onReportClick: (lat: number, lng: number) => void 
+}) {
   const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
   const recentReports = reports.filter(
     (r) => new Date(r.created_at).getTime() >= twentyFourHoursAgo
@@ -242,7 +245,7 @@ export default function Sidebar({
         )}
 
         {recentReports.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-8 relative z-10000">
             <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
               Recent Reports (Last 24h)
             </h2>
@@ -253,7 +256,11 @@ export default function Sidebar({
                 .map((report) => (
                   <div
                     key={report.id}
-                    className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm"
+                    className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm cursor-pointer hover:bg-slate-100"
+                    onClick={() => {
+                      console.log(`Report coordinates: ${report.geo_coordinates}`);
+                      onReportClick(report.geo_coordinates[0], report.geo_coordinates[1]);
+                    }}
                   >
                     <div className="font-semibold text-slate-800">
                       {report.incident_type}
