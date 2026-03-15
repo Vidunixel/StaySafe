@@ -42,6 +42,18 @@ export default function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem("theme");
+    if (stored === "dark" || stored === "light") return stored === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    localStorage.setItem("theme", isDark ? "dark" : "light");
+  }, [isDark]);
+
   const fetchReports = async () => {
     const { data, error } = await supabase
       .from("reports")
@@ -95,12 +107,12 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-hidden dark:bg-slate-900 dark:text-slate-100">
       {/* Always-visible sidebar toggle button */}
       <Button
         variant="outline"
         size="icon"
-        className="fixed left-0 top-1/2 z-30 -translate-y-1/2 h-10 w-8 rounded-r-lg rounded-l-none border-l-0 shadow-md bg-white hover:bg-slate-50 transition-[left] duration-300 ease-in-out"
+        className="fixed left-0 top-1/2 z-30 -translate-y-1/2 h-10 w-8 rounded-r-lg rounded-l-none border-l-0 shadow-md bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-600 transition-[left] duration-300 ease-in-out"
         style={{ left: sidebarOpen ? "20rem" : 0 }}
         onClick={() => setSidebarOpen((open) => !open)}
         aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -118,6 +130,7 @@ export default function App() {
         style={{ width: sidebarOpen ? "20rem" : 0 }}
       >
         <Sidebar
+          isDark={isDark}
           showHeatmap={showHeatmap}
           setShowHeatmap={setShowHeatmap}
           showCCTV={showCCTV}
@@ -147,6 +160,8 @@ export default function App() {
         }}
       >
         <MapView
+          isDark={isDark}
+          onThemeToggle={() => setIsDark((d) => !d)}
           sidebarOpen={sidebarOpen}
           showHeatmap={showHeatmap}
           showCCTV={showCCTV}
@@ -164,6 +179,7 @@ export default function App() {
 
         {reportingLocation && (
           <ReportModal
+            isDark={isDark}
             reportingLocation={reportingLocation}
             onSubmit={(data) => {
               void submitReport(data);

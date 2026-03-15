@@ -21,6 +21,7 @@ import {
 import type { Report } from "../../App";
 
 type SidebarProps = {
+  isDark?: boolean;
   showHeatmap: boolean;
   setShowHeatmap: React.Dispatch<React.SetStateAction<boolean>>;
   showCCTV: boolean;
@@ -41,6 +42,7 @@ type SidebarProps = {
 };
 
 export default function Sidebar({
+  isDark,
   showHeatmap,
   setShowHeatmap,
   showCCTV,
@@ -69,8 +71,8 @@ export default function Sidebar({
   const [navigationOpen, setNavigationOpen] = useState(false);
 
   return (
-    <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-lg relative">
-      <div className="p-6 border-b border-slate-100 bg-slate-900 text-white flex items-center gap-3 shadow-xl">
+    <aside className="w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col z-20 shadow-lg relative">
+      <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-900 text-white flex items-center gap-3 shadow-xl">
         <div className="bg-blue-600 p-2 rounded-lg">
           <Shield className="w-6 h-6 text-white" />
         </div>
@@ -84,12 +86,12 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="p-6 flex-1 overflow-y-auto">
+      <div className="p-6 flex-1 overflow-y-auto bg-white dark:bg-slate-900">
         <Collapsible open={safetyOpen} onOpenChange={setSafetyOpen}>
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 hover:text-slate-500 transition-colors"
+              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 hover:text-slate-500 dark:hover:text-slate-400 transition-colors"
             >
               {safetyOpen ? (
                 <ChevronDown className="w-4 h-4 shrink-0" />
@@ -169,7 +171,7 @@ export default function Sidebar({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4 hover:text-slate-500 transition-colors"
+              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4 mt-4 hover:text-slate-500 dark:hover:text-slate-400 transition-colors"
             >
               {navigationOpen ? (
                 <ChevronDown className="w-4 h-4 shrink-0" />
@@ -192,9 +194,9 @@ export default function Sidebar({
               <button
                 onClick={() => setShowNavigation((prev) => !prev)}
                 className={`flex items-center gap-3 p-4 w-full max-w-xs rounded-xl shadow-md 
-                  ${showNavigation ? "bg-green-900 text-white border-green-900" 
-                                  : "bg-green-700 text-white border-green-700"} 
-                  hover:bg-green-800 transition-all duration-200`}
+                  ${showNavigation ? "bg-green-900 text-white border-green-900 dark:bg-green-800 dark:border-green-800" 
+                                  : "bg-green-700 text-white border-green-700 dark:bg-green-800 dark:border-green-800"} 
+                  hover:bg-green-800 dark:hover:bg-green-700 transition-all duration-200`}
               >
                 <div className="p-2 rounded-lg bg-green-900 text-white">
                   <ArrowUpRight className="w-5 h-5" />
@@ -204,7 +206,7 @@ export default function Sidebar({
                 </div>
               </button>
               {showNavigation && (
-                <div className="mt-4 bg-slate-200 border border-slate-100 rounded-xl p-4 text-sm text-slate-900">
+                <div className="mt-4 bg-slate-200 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl p-4 text-sm text-slate-900 dark:text-slate-100">
                   <p className="font-medium">Navigation is active.</p>
                   <p className="text-xs mt-1">
                     Click on the map to set a destination and view the safest route
@@ -226,10 +228,10 @@ export default function Sidebar({
 
         {reports.length === 0 && (
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">
               How to Report
             </h2>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-600">
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-4 text-sm text-slate-600 dark:text-slate-400">
               <p className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                 <span>
@@ -243,7 +245,7 @@ export default function Sidebar({
 
         {recentReports.length > 0 && (
           <div className="mt-8">
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">
               Recent Reports (Last 24h)
             </h2>
             <div className="space-y-3">
@@ -253,15 +255,15 @@ export default function Sidebar({
                 .map((report) => (
                   <div
                     key={report.id}
-                    className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm"
+                    className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-600 text-sm"
                   >
-                    <div className="font-semibold text-slate-800">
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">
                       {report.incident_type}
                     </div>
-                    <div className="text-slate-500 text-xs mt-1 truncate">
+                    <div className="text-slate-500 dark:text-slate-400 text-xs mt-1 truncate">
                       {report.description}
                     </div>
-                    <div className="text-slate-400 text-xs mt-1.5">
+                    <div className="text-slate-400 dark:text-slate-500 text-xs mt-1.5">
                       {new Date(report.created_at).toLocaleString()}
                     </div>
                   </div>

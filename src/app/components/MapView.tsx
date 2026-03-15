@@ -21,6 +21,8 @@ import {
   Building2,
   Route,
   Megaphone,
+  Sun,
+  Moon,
 } from "lucide-react";
 import {
   cctvIcon,
@@ -41,6 +43,54 @@ import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 import { add } from "date-fns";
 
 type LatLngTuple = [number, number];
+
+// Fallback sample data when Supabase tables are empty so layers are visible
+const SAMPLE_CCTV_POINTS: [number, number][] = [
+  [-37.8136, 144.9631],
+  [-37.818, 144.969],
+  [-37.807, 144.958],
+  [-37.825, 144.952],
+  [-37.81, 144.97],
+];
+const SAMPLE_LIGHTING_POINTS: [number, number][] = [
+  [-37.814, 144.962],
+  [-37.816, 144.965],
+  [-37.812, 144.968],
+  [-37.82, 144.96],
+  [-37.808, 144.955],
+];
+const SAMPLE_POLICE_STATIONS: Array<{ position: [number, number]; name: string }> = [
+  { position: [-37.827, 144.952], name: "Melbourne East Police Station" },
+  { position: [-37.813, 144.969], name: "Southern Cross Police Hub" },
+];
+const SAMPLE_PEDESTRIAN_SEGMENTS: [number, number][][] = [
+  [
+    [-37.8136, 144.9631],
+    [-37.814, 144.964],
+    [-37.815, 144.965],
+  ],
+  [
+    [-37.816, 144.966],
+    [-37.817, 144.967],
+  ],
+];
+const SAMPLE_PEDESTRIAN_POINTS: [number, number][] = [
+  [-37.8136, 144.9631],
+  [-37.8145, 144.9645],
+  [-37.816, 144.966],
+];
+const SAMPLE_CRIME_STAT = {
+  id: "sample-melb",
+  local_gov_area: "Melbourne CBD (sample)",
+  avg_rate_per_100k: 55,
+  geo_bounds: [
+    [144.95, -37.82],
+    [144.98, -37.82],
+    [144.98, -37.81],
+    [144.95, -37.81],
+    [144.95, -37.82],
+  ],
+};
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -97,6 +147,8 @@ function FitRoute({ routePath }: { routePath: LatLngTuple[] }) {
 }
 
 type MapViewProps = {
+  isDark?: boolean;
+  onThemeToggle?: () => void;
   sidebarOpen?: boolean;
   showHeatmap: boolean;
   showCCTV: boolean;
@@ -115,6 +167,8 @@ type MapViewProps = {
 };
 
 export default function MapView({
+  isDark,
+  onThemeToggle,
   sidebarOpen,
   showHeatmap,
   showCCTV,
@@ -315,7 +369,7 @@ export default function MapView({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [toSuggestionsOpen]);
 
-  const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
+  const heatmapVisible = showHeatmap;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
     const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -414,9 +468,14 @@ export default function MapView({
     const coords = report.geo_coordinates;
     if (!Array.isArray(coords) || coords.length < 2) return null;
 
-    const lat = Number(coords[0]);
-    const lng = Number(coords[1]);
-    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+    const a = Number(coords[0]);
+    const b = Number(coords[1]);
+    if (Number.isNaN(a) || Number.isNaN(b)) return null;
+
+    // Support both [lat, lng] and GeoJSON [lng, lat] from database
+    const lat = Math.abs(a) <= 90 ? a : b;
+    const lng = Math.abs(a) <= 90 ? b : a;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
 
     return [lat, lng];
   }
@@ -710,7 +769,7 @@ export default function MapView({
 
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url={isDark ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"}
         />
 
         {userLocation && (
@@ -724,14 +783,29 @@ export default function MapView({
         {showHeatmap &&
           heatmapVisible &&
           !crimeStatsLoading &&
-          crimeStats.map((stat) => {
+          (crimeStats.length > 0 ? crimeStats : [SAMPLE_CRIME_STAT]).map((stat) => {
             const { min, max } = crimeRateRange;
             const range = max - min || 1;
-            const t = (stat.avg_rate_per_100k - min) / range;
-            const heatScale = Math.max(0, Math.min(1, 0.38 + 0.62 * t));
-            const hue = 120 * (1 - heatScale);
-            const fillColor = `hsl(${hue}, 75%, 52%)`;
-            const fillOpacity = 0.4 + heatScale * 0.2;
+            const t = Math.max(0, Math.min(1, (stat.avg_rate_per_100k - min) / range));
+            const fillOpacity = 0.4 + t * 0.55;
+            const fillColor = (() => {
+              const green = { r: 22, g: 163, b: 74 };
+              const yellow = { r: 250, g: 204, b: 21 };
+              const red = { r: 220, g: 38, b: 38 };
+              let r: number, g: number, b: number;
+              if (t <= 0.5) {
+                const s = t * 2;
+                r = Math.round(green.r + (yellow.r - green.r) * s);
+                g = Math.round(green.g + (yellow.g - green.g) * s);
+                b = Math.round(green.b + (yellow.b - green.b) * s);
+              } else {
+                const s = (t - 0.5) * 2;
+                r = Math.round(yellow.r + (red.r - yellow.r) * s);
+                g = Math.round(yellow.g + (red.g - yellow.g) * s);
+                b = Math.round(yellow.b + (red.b - yellow.b) * s);
+              }
+              return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+            })();
             const positions = geoBoundsToLatLngs(
               (stat as { geo_bounds?: unknown }).geo_bounds,
             );
@@ -742,10 +816,11 @@ export default function MapView({
                 key={stat.id}
                 positions={positions as any}
                 pathOptions={{
-                  color: "rgba(0, 0, 0, 0.25)",
+                  color: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.3)",
                   weight: 1,
                   fillColor,
                   fillOpacity,
+                  fill: true,
                 }}
                 eventHandlers={{
                   click: (e) => {
@@ -762,11 +837,11 @@ export default function MapView({
                 }}
               >
                 <Popup>
-                  <div className="font-sans min-w-[140px]">
+                  <div className="font-sans min-w-[140px] text-left text-slate-900 bg-white px-2 py-1.5 rounded shadow">
                     <h3 className="font-bold text-sm text-slate-800">
                       {stat.local_gov_area}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-600 mt-1">
                       Avg rate per 100k:{" "}
                       <span className="font-semibold text-slate-700">
                         {stat.avg_rate_per_100k.toFixed(1)}
@@ -779,7 +854,7 @@ export default function MapView({
           })}
 
         {showCCTV &&
-          cctvPoints.map((point, idx) => (
+          (cctvPoints.length > 0 ? cctvPoints : SAMPLE_CCTV_POINTS).map((point, idx) => (
             <Marker
             key={`cctv-${idx}`}
             position={point}
@@ -801,7 +876,7 @@ export default function MapView({
           ))}
 
         {showLighting &&
-          lightingPoints.map((point, idx) => (
+          (lightingPoints.length > 0 ? lightingPoints : SAMPLE_LIGHTING_POINTS).map((point, idx) => (
             <CircleMarker
               key={`light-${idx}`}
               center={point}
@@ -862,7 +937,7 @@ export default function MapView({
           })}
 
         {showPoliceStations &&
-          policeStations.map((station, idx) => (
+          (policeStations.length > 0 ? policeStations : SAMPLE_POLICE_STATIONS).map((station, idx) => (
             <Marker
               key={`police-${idx}`}
               position={station.position}
@@ -874,18 +949,18 @@ export default function MapView({
               }}
             >
               <Popup>
-                <div className="font-sans text-xs">
-                  <span className="font-semibold text-indigo-700 block mb-1">
-                    Police Station
-                  </span>
-                  <span className="text-slate-600">{station.name}</span>
+                <div className="font-sans text-left text-slate-900 bg-white px-2 py-1.5 rounded shadow min-w-[160px]">
+                  <h3 className="font-bold text-sm text-indigo-700">
+                    {station.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Police Station</p>
                 </div>
               </Popup>
             </Marker>
           ))}
 
         {showPedestrianNetwork &&
-          pedestrianSegments.map((segment, idx) => (
+          (pedestrianSegments.length > 0 ? pedestrianSegments : SAMPLE_PEDESTRIAN_SEGMENTS).map((segment, idx) => (
             <Polyline
               key={`pedestrian-${idx}`}
               positions={segment}
@@ -893,7 +968,7 @@ export default function MapView({
             />
           ))}
         {showPedestrianNetwork &&
-          pedestrianPoints.map((point, idx) => (
+          (pedestrianPoints.length > 0 ? pedestrianPoints : SAMPLE_PEDESTRIAN_POINTS).map((point, idx) => (
             <CircleMarker
               key={`pedestrian-point-${idx}`}
               center={point}
@@ -951,49 +1026,57 @@ export default function MapView({
         )}
       </MapContainer>
 
-      {/* Floating Recenter Button */}
-      <div
-        onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
-        className="absolute bottom-24 right-2 z-[500] cursor-pointer bg-blue-500 p-2 rounded-full flex items-center justify-center hover:bg-blue-600"
+      {/* Bottom-right: location, theme, community safety - above zoom control */}
+      <div className="absolute right-2 z-[1100] flex flex-col gap-2 items-end" style={{ bottom: "7.5rem" }}>
+        <div
+          onClick={() => userLocation && mapRef.current?.flyTo(userLocation, 15)}
+          className="h-10 w-10 rounded-xl shadow-md flex items-center justify-center cursor-pointer bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white border-0"
+          aria-label="Recenter on my location"
         >
-          {recenterIcon} 
-      </div>
-      <div className="absolute bottom-35 right-2 z-[400]">
-        {/* Icon button */}
+          {recenterIcon}
+        </div>
+        {onThemeToggle && (
+          <button
+            type="button"
+            onClick={onThemeToggle}
+            className="h-10 w-10 rounded-xl border border-slate-200 bg-white shadow-md flex items-center justify-center hover:bg-slate-50 text-slate-600 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        )}
         <div className="relative group">
-        <button
-          onClick={() => setReportModeActive((prev) => !prev)}
-          className={`h-10 w-10 rounded-xl border flex items-center justify-center hover:bg-red-700 transition-colors
-            ${reportModeActive
-              ? "border-red-200 bg-red-50 text-red-600"
-              : "border-red-300 bg-red-600 text-white"
-            }`}
-        >
-          <Megaphone className="h-5 w-5" />
-        </button>
-
-        {/* Tooltip with title + description on hover */}
-        <div className="absolute right-full bottom-1/2 mr-3 w-44 rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200">
-          <div className="flex flex-col p-3 gap-1">
-            <span className="text-[12px] uppercase tracking-wider font-semibold text-slate-400">
-              Community Safety
-            </span>
-            <span className="text-xs text-slate-700">
-              Report an incident by clicking on a point in the map.
-            </span>
+          <button
+            onClick={() => setReportModeActive((prev) => !prev)}
+            className={`h-10 w-10 rounded-xl border flex items-center justify-center transition-colors
+              ${reportModeActive
+                ? "border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
+                : "border-red-300 bg-red-600 text-white hover:bg-red-700 dark:border-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+              }`}
+          >
+            <Megaphone className="h-5 w-5" />
+          </button>
+          <div className="absolute right-full bottom-1/2 mr-3 w-44 rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 dark:border-slate-600 dark:bg-slate-800/95">
+            <div className="flex flex-col p-3 gap-1">
+              <span className="text-[12px] uppercase tracking-wider font-semibold text-slate-400 dark:text-slate-500">
+                Community Safety
+              </span>
+              <span className="text-xs text-slate-700 dark:text-slate-300">
+                Report an incident by clicking on a point in the map.
+              </span>
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       {showNavigation && (
         <form
           onSubmit={handleRouteSubmit}
-          className="absolute top-6 left-6 z-[450] bg-white p-4 rounded-xl shadow-lg border border-slate-200 w-[320px]"
+          className="absolute top-6 left-6 z-[450] bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-200 dark:border-slate-600 w-[320px]"
         >
           <div className="flex items-center gap-2 mb-3">
-            <Route className="w-4 h-4 text-emerald-600" />
-            <h4 className="text-sm font-semibold text-slate-900">Find Route</h4>
+            <Route className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Find Route</h4>
           </div>
 
           <div className="space-y-2">
@@ -1001,7 +1084,7 @@ export default function MapView({
               value={fromInput}
               onChange={(event) => setFromInput(event.target.value)}
               placeholder="From (default: current location)"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <div ref={toInputContainerRef} className="relative">
               <input
@@ -1012,20 +1095,20 @@ export default function MapView({
                 }}
                 onFocus={() => toSuggestions.length > 0 && setToSuggestionsOpen(true)}
                 placeholder="To (e.g. Melbourne Central)"
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 autoComplete="off"
               />
               {toSuggestionsOpen && (
                 <ul
-                  className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg z-[500] py-1"
+                  className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg z-[500] py-1"
                   role="listbox"
                 >
                   {toSuggestionsLoading ? (
-                    <li className="px-3 py-2 text-sm text-slate-500">
+                    <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
                       Searching…
                     </li>
                   ) : toSuggestions.length === 0 ? (
-                    <li className="px-3 py-2 text-sm text-slate-500">
+                    <li className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">
                       No places found
                     </li>
                   ) : (
@@ -1033,7 +1116,7 @@ export default function MapView({
                       <li
                         key={`${suggestion.lat}-${suggestion.lng}-${idx}`}
                         role="option"
-                        className="px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50 cursor-pointer truncate"
+                        className="px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer truncate"
                         onClick={() => {
                           setToInput(suggestion.display_name);
                           setSelectedToSuggestion(suggestion);
@@ -1050,14 +1133,14 @@ export default function MapView({
           </div>
 
           {routeError && (
-            <p className="mt-2 text-xs text-red-600">{routeError}</p>
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{routeError}</p>
           )}
 
           <div className="mt-3">
             <button
               type="submit"
               disabled={isFindingRoute}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
               {isFindingRoute ? "Finding…" : "Get Route"}
             </button>
@@ -1066,18 +1149,18 @@ export default function MapView({
       )}
 
       {showHeatmap && (
-        <div className="absolute bottom-6 left-6 z-[400] bg-white p-4 rounded-xl shadow-lg border border-slate-100">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+        <div className="absolute bottom-6 left-6 z-[400] bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-slate-100 dark:border-slate-600">
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
             Risk Indicator
           </h4>
           <div className="flex flex-col gap-1.5">
             <div
-              className="h-3 w-32 rounded-md border border-slate-200"
+              className="h-3 w-32 rounded-md border border-slate-200 dark:border-slate-600"
               style={{
                 background: "linear-gradient(to right, hsl(120, 75%, 45%), hsl(60, 75%, 55%), hsl(0, 75%, 45%))",
               }}
             />
-            <div className="flex justify-between text-xs text-slate-600 w-32">
+            <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 w-32">
               <span>Low</span>
               <span>High</span>
             </div>
@@ -1086,11 +1169,11 @@ export default function MapView({
       )}
       
       {showNavigation && navigationSummary && (
-        <div className="absolute top-6 right-6 z-[450] bg-white p-4 rounded-xl shadow-lg border border-emerald-100 min-w-[220px]">
-          <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+        <div className="absolute top-6 right-6 z-[450] bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg border border-emerald-100 dark:border-slate-600 min-w-[220px]">
+          <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">
             Route Summary
           </h4>
-          <div className="space-y-1.5 text-sm text-slate-700">
+          <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
             <div className="flex items-center justify-between">
               <span>Safety Score</span>
               <span className="font-semibold">
