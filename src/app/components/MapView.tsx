@@ -197,6 +197,18 @@ export default function MapView({
   const [showReportToast, setShowReportToast] = useState(false);
   const previousDraftLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const reportToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // When the map container resizes (e.g. sidebar toggle), tell Leaflet to recalculate
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      mapRef.current?.invalidateSize();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
@@ -530,7 +542,7 @@ export default function MapView({
 
 
   return (
-    <div className="w-full h-full relative z-0">
+    <div ref={mapContainerRef} className="w-full h-full relative z-0">
       <MapContainer
         center={[-37.8136, 144.9631 ]}
         zoom={11}

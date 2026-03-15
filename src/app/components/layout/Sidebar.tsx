@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Shield,
   Map as MapIcon,
@@ -9,8 +9,15 @@ import {
   Building2,
   Route,
   ArrowUpRight,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import ToggleCard from "../ToggleCard";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import type { Report } from "../../App";
 
 type SidebarProps = {
@@ -57,6 +64,10 @@ export default function Sidebar({
     (r) => new Date(r.created_at).getTime() >= twentyFourHoursAgo
   );
 
+  const [safetyOpen, setSafetyOpen] = useState(true);
+  const [servicesOpen, setServicesOpen] = useState(true);
+  const [navigationOpen, setNavigationOpen] = useState(true);
+
   return (
     <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-lg relative">
       <div className="p-6 border-b border-slate-100 bg-slate-900 text-white flex items-center gap-3 shadow-xl">
@@ -74,109 +85,144 @@ export default function Sidebar({
       </div>
 
       <div className="p-6 flex-1 overflow-y-auto">
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
-          Safety
-        </h2>   
+        <Collapsible open={safetyOpen} onOpenChange={setSafetyOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 hover:text-slate-500 transition-colors"
+            >
+              {safetyOpen ? (
+                <ChevronDown className="w-4 h-4 shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              )}
+              <span>Safety</span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-3">
+              <ToggleCard
+                active={showHeatmap}
+                onClick={() => setShowHeatmap((prev) => !prev)}
+                icon={<MapIcon className="w-5 h-5" />}
+                title="Crime Risk"
+                description="Predicted crime risk "
+                colorClass="text-red-700 bg-red-100 border-red-300"
+              />
+              <ToggleCard
+                active={showReports}
+                onClick={() => setShowReports((prev) => !prev)}
+                icon={<ShieldAlert className="w-5 h-5" />}
+                title="User Reports"
+                description="Incident reports"
+                colorClass="text-red-500 bg-red-50 border-red-200"
+              />
+              <ToggleCard
+                active={showLighting}
+                onClick={() => setShowLighting((prev) => !prev)}
+                icon={<Lightbulb className="w-5 h-5" />}
+                title="Street Lighting"
+                description="Well-lit areas"
+                colorClass="text-amber-500 bg-amber-50 border-amber-200"
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <div className="space-y-3">
-          <ToggleCard
-            active={showHeatmap}
-            onClick={() => setShowHeatmap((prev) => !prev)}
-            icon={<MapIcon className="w-5 h-5" />}
-            title="Crime Risk"
-            description="Predicted crime risk "
-            colorClass="text-red-700 bg-red-100 border-red-300"
-          />
-          <ToggleCard
-            active={showReports}
-            onClick={() => setShowReports((prev) => !prev)}
-            icon={<ShieldAlert className="w-5 h-5" />}
-            title="User Reports"
-            description="Incident reports"
-            colorClass="text-red-500 bg-red-50 border-red-200"
-          />
-          <ToggleCard
-            active={showLighting}
-            onClick={() => setShowLighting((prev) => !prev)}
-            icon={<Lightbulb className="w-5 h-5" />}
-            title="Street Lighting"
-            description="Well-lit areas"
-            colorClass="text-amber-500 bg-amber-50 border-amber-200"
-          />
-        </div>
+        <Collapsible open={servicesOpen} onOpenChange={setServicesOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4 hover:text-slate-500 transition-colors"
+            >
+              {servicesOpen ? (
+                <ChevronDown className="w-4 h-4 shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              )}
+              <span>Services</span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-3">
+              <ToggleCard
+                active={showCCTV}
+                onClick={() => setShowCCTV((prev) => !prev)}
+                icon={<Video className="w-5 h-5" />}
+                title="CCTV Cameras"
+                description="Surveillance areas"
+                colorClass="text-blue-600 bg-blue-50 border-blue-200"
+              />
+              <ToggleCard
+                active={showPoliceStations}
+                onClick={() => setShowPoliceStations((prev) => !prev)}
+                icon={<Building2 className="w-5 h-5" />}
+                title="Police Stations"
+                description="Police locations"
+                colorClass="text-indigo-600 bg-indigo-50 border-indigo-200"
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4">
-          Services
-        </h2>
-
-        <div className="space-y-3">
-          <ToggleCard
-            active={showCCTV}
-            onClick={() => setShowCCTV((prev) => !prev)}
-            icon={<Video className="w-5 h-5" />}
-            title="CCTV Cameras"
-            description="Surveillance areas"
-            colorClass="text-blue-600 bg-blue-50 border-blue-200"
-          />
-          <ToggleCard
-            active={showPoliceStations}
-            onClick={() => setShowPoliceStations((prev) => !prev)}
-            icon={<Building2 className="w-5 h-5" />}
-            title="Police Stations"
-            description="Police locations"
-            colorClass="text-indigo-600 bg-indigo-50 border-indigo-200"
-          />
-
-        </div>
-          
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4">
-          Navigation
-        </h2>
-
-        <div className="space-y-3">
-          <ToggleCard
-            active={showPedestrianNetwork}
-            onClick={() => setShowPedestrianNetwork((prev) => !prev)}
-            icon={<Route className="w-5 h-5" />}
-            title="Pedestrian Network"
-            description="Walking paths"
-            colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
-          />
-
-        <button
-          onClick={() => setShowNavigation((prev) => !prev)}
-          className={`flex items-center gap-3 p-4 w-full max-w-xs rounded-xl shadow-md 
-            ${showNavigation ? "bg-green-900 text-white border-green-900" 
-                            : "bg-green-700 text-white border-green-700"} 
-            hover:bg-green-800 transition-all duration-200`}
-        >
-          <div className="p-2 rounded-lg bg-green-900 text-white">
-            <ArrowUpRight className="w-5 h-5" />
-          </div>
-          <div className="text-left">
-            <h3 className="font-semibold text-lg">Safe Navigation</h3>
-          </div>
-        </button>
-
-        </div>
-
-        {showNavigation && (
-          <div className="mt-4 bg-slate-200 border border-slate-100 rounded-xl p-4 text-sm text-slate-900">
-            <p className="font-medium">Navigation is active.</p>
-            <p className="text-xs mt-1">
-              Click on the map to set a destination and view the safest route
-              estimate.
-            </p>
-            {destination && (
+        <Collapsible open={navigationOpen} onOpenChange={setNavigationOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 mt-4 hover:text-slate-500 transition-colors"
+            >
+              {navigationOpen ? (
+                <ChevronDown className="w-4 h-4 shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              )}
+              <span>Navigation</span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-3">
+              <ToggleCard
+                active={showPedestrianNetwork}
+                onClick={() => setShowPedestrianNetwork((prev) => !prev)}
+                icon={<Route className="w-5 h-5" />}
+                title="Pedestrian Network"
+                description="Walking paths"
+                colorClass="text-emerald-600 bg-emerald-50 border-emerald-200"
+              />
               <button
-                onClick={clearNavigationDestination}
-                className="mt-3 w-full bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition-colors"
+                onClick={() => setShowNavigation((prev) => !prev)}
+                className={`flex items-center gap-3 p-4 w-full max-w-xs rounded-xl shadow-md 
+                  ${showNavigation ? "bg-green-900 text-white border-green-900" 
+                                  : "bg-green-700 text-white border-green-700"} 
+                  hover:bg-green-800 transition-all duration-200`}
               >
-                Clear Destination
+                <div className="p-2 rounded-lg bg-green-900 text-white">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-lg">Safe Navigation</h3>
+                </div>
               </button>
-            )}
-          </div>
-        )}
+              {showNavigation && (
+                <div className="mt-4 bg-slate-200 border border-slate-100 rounded-xl p-4 text-sm text-slate-900">
+                  <p className="font-medium">Navigation is active.</p>
+                  <p className="text-xs mt-1">
+                    Click on the map to set a destination and view the safest route
+                    estimate.
+                  </p>
+                  {destination && (
+                    <button
+                      onClick={clearNavigationDestination}
+                      className="mt-3 w-full bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-lg transition-colors"
+                    >
+                      Clear Destination
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {reports.length === 0 && (
           <div className="mt-8">

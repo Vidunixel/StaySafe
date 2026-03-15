@@ -4,6 +4,8 @@ import Sidebar from "./components/layout/Sidebar";
 import ReportModal from "./components/ReportModal";
 import { useMapState, type ReportFormValues } from "../hooks/useMapState";
 import { supabase } from "../lib/supabase";
+import { Button } from "./components/ui/button";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 export type Report = {
   id: string;
@@ -38,6 +40,7 @@ export default function App() {
   } = useMapState();
 
   const [reports, setReports] = useState<Report[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const fetchReports = async () => {
     const { data, error } = await supabase
@@ -93,27 +96,49 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-hidden">
-      <Sidebar
-        showHeatmap={showHeatmap}
-        setShowHeatmap={setShowHeatmap}
-        showCCTV={showCCTV}
-        setShowCCTV={setShowCCTV}
-        showLighting={showLighting}
-        setShowLighting={setShowLighting}
-        showReports={showReports}
-        setShowReports={setShowReports}
-        showNavigation={showNavigation}
-        setShowNavigation={setShowNavigation}
-        destination={destination}
-        clearNavigationDestination={clearNavigationDestination}
-        showPoliceStations={showPoliceStations}
-        setShowPoliceStations={setShowPoliceStations}
-        showPedestrianNetwork={showPedestrianNetwork}
-        setShowPedestrianNetwork={setShowPedestrianNetwork}
-        reports={reports}
-      />
+      {/* Always-visible sidebar toggle button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="fixed left-0 top-1/2 z-30 -translate-y-1/2 h-10 w-8 rounded-r-lg rounded-l-none border-l-0 shadow-md bg-white hover:bg-slate-50 transition-[left] duration-300 ease-in-out"
+        style={{ left: sidebarOpen ? "20rem" : 0 }}
+        onClick={() => setSidebarOpen((open) => !open)}
+        aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+      >
+        {sidebarOpen ? (
+          <PanelLeftClose className="h-5 w-5" />
+        ) : (
+          <PanelLeftOpen className="h-5 w-5" />
+        )}
+      </Button>
 
-      <main className="flex-1 relative">
+      {/* Sidebar wrapper: animated width so main content resizes smoothly */}
+      <div
+        className="flex shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
+        style={{ width: sidebarOpen ? "20rem" : 0 }}
+      >
+        <Sidebar
+          showHeatmap={showHeatmap}
+          setShowHeatmap={setShowHeatmap}
+          showCCTV={showCCTV}
+          setShowCCTV={setShowCCTV}
+          showLighting={showLighting}
+          setShowLighting={setShowLighting}
+          showReports={showReports}
+          setShowReports={setShowReports}
+          showNavigation={showNavigation}
+          setShowNavigation={setShowNavigation}
+          destination={destination}
+          clearNavigationDestination={clearNavigationDestination}
+          showPoliceStations={showPoliceStations}
+          setShowPoliceStations={setShowPoliceStations}
+          showPedestrianNetwork={showPedestrianNetwork}
+          setShowPedestrianNetwork={setShowPedestrianNetwork}
+          reports={reports}
+        />
+      </div>
+
+      <main className="flex-1 min-w-0 relative transition-[flex] duration-300 ease-in-out">
         <MapView
           showHeatmap={showHeatmap}
           showCCTV={showCCTV}
