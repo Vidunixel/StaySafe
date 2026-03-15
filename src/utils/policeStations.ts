@@ -1,44 +1,44 @@
-/**
- * Load police station locations from data/police_stations.csv.
- * CSV columns: X (lng), Y (lat), ..., facility_name
- */
-import policeStationsCsvUrl from '../../data/police_stations.csv?url';
+import { supabase } from "../lib/supabase";
 
 export type PoliceStation = {
   position: [number, number];
   name: string;
 };
 
-function parseRow(line: string): PoliceStation | null {
-  const parts = line.split(',');
-  if (parts.length < 8) return null;
-  const lng = parseFloat(parts[0]);
-  const lat = parseFloat(parts[1]);
+type PoliceStationRow = {
+  geo_coordinates: unknown;
+};
+
+function parseStation(row: PoliceStationRow): PoliceStation | null {
+  if (!Array.isArray(row.geo_coordinates) || row.geo_coordinates.length < 2) {
+    return null;
+  }
+  const lat = Number(row.geo_coordinates[0]);
+  const lng = Number(row.geo_coordinates[1]);
   if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
-  const name = (parts[7] ?? 'Police Station').trim();
-  return { position: [lat, lng], name };
+  return { position: [lat, lng], name: "Police Station" };
 }
 
 /**
- * Fetch and parse police_stations.csv, return stations for map markers.
+ * Fetch police stations from Supabase police_stations table.
  */
 export async function loadPoliceStations(): Promise<PoliceStation[]> {
   try {
-    const res = await fetch(policeStationsCsvUrl);
-    if (!res.ok) {
-      console.warn('Could not load police_stations.csv:', res.status);
+    const { data, error } = await supabase
+      .from("police_stations")
+      .select("geo_coordinates")
+      .not("geo_coordinates", "is", null);
+
+    if (error) {
+      console.warn("Could not load police_stations:", error.message);
       return [];
     }
-    const text = await res.text();
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    const stations: PoliceStation[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const row = parseRow(lines[i]);
-      if (row) stations.push(row);
-    }
-    return stations;
+
+    return ((data ?? []) as PoliceStationRow[])
+      .map(parseStation)
+      .filter((station): station is PoliceStation => station !== null);
   } catch (e) {
-    console.warn('Could not load police_stations.csv', e);
+    console.warn("Could not load police_stations", e);
     return [];
   }
 }

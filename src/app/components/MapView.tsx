@@ -3,6 +3,7 @@ import {
   MapContainer,
   TileLayer,
   Marker,
+  CircleMarker,
   Popup,
   Polyline,
   Polygon,
@@ -23,7 +24,6 @@ import {
 } from "lucide-react";
 import {
   cctvIcon,
-  lightingIcon,
   reportIcon,
   draftIcon,
   userIcon,
@@ -180,8 +180,12 @@ export default function MapView({
   const [pedestrianSegments, setPedestrianSegments] = useState<
     [number, number][][]
   >([]);
+  const [pedestrianPoints, setPedestrianPoints] = useState<[number, number][]>([]);
   useEffect(() => {
-    loadPedestrianNetwork(3000).then(setPedestrianSegments);
+    loadPedestrianNetwork(3000).then((network) => {
+      setPedestrianSegments(network.segments);
+      setPedestrianPoints(network.points);
+    });
   }, []);
 
   const [fromInput, setFromInput] = useState("Current location");
@@ -638,7 +642,17 @@ export default function MapView({
 
         {showLighting &&
           lightingPoints.map((point, idx) => (
-            <Marker key={`light-${idx}`} position={point} icon={lightingIcon}>
+            <CircleMarker
+              key={`light-${idx}`}
+              center={point}
+              radius={4}
+              pathOptions={{
+                color: "#ca8a04",
+                fillColor: "#facc15",
+                fillOpacity: 0.95,
+                weight: 1,
+              }}
+            >
               <Popup>
                 <div className="font-sans text-xs">
                   <span className="font-semibold text-amber-600 block mb-1">
@@ -649,7 +663,7 @@ export default function MapView({
                   </span>
                 </div>
               </Popup>
-            </Marker>
+            </CircleMarker>
           ))}
         {showReports &&
           reports.map((report) => {
@@ -703,6 +717,28 @@ export default function MapView({
               positions={segment}
               pathOptions={{ color: "#10b981", weight: 2, opacity: 0.35 }}
             />
+          ))}
+        {showPedestrianNetwork &&
+          pedestrianPoints.map((point, idx) => (
+            <CircleMarker
+              key={`pedestrian-point-${idx}`}
+              center={point}
+              radius={4}
+              pathOptions={{
+                color: "#16a34a",
+                fillColor: "#22c55e",
+                fillOpacity: 0.95,
+                weight: 1,
+              }}
+            >
+              <Popup>
+                <div className="font-sans text-xs">
+                  <span className="font-semibold text-green-700">
+                    Pedestrian Network Point
+                  </span>
+                </div>
+              </Popup>
+            </CircleMarker>
           ))}
 
         {draftLocation && (

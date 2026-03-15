@@ -1,38 +1,38 @@
-/**
- * Load CCTV camera locations from data/cctv-locations.csv.
- * The CSV has a geo_point column with format "lat, lng".
- */
-import cctvCsvUrl from '../../data/cctv-locations.csv?url';
+import { supabase } from "../lib/supabase";
 
-function parseGeoPointFromLine(line: string): [number, number] | null {
-  const match = line.match(/"(-?\d+\.\d+),\s*(-?\d+\.\d+)"/);
-  if (!match) return null;
-  const lat = parseFloat(match[1]);
-  const lng = parseFloat(match[2]);
+type CctvRow = {
+  geo_coordinates: unknown;
+};
+
+function parseGeoCoordinates(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const lat = Number(value[0]);
+  const lng = Number(value[1]);
   if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
   return [lat, lng];
 }
 
 /**
- * Fetch and parse cctv-locations.csv, return array of [lat, lng].
+ * Fetch CCTV camera locations from Supabase table cctv_locations.
  */
 export async function loadCctvLocations(): Promise<[number, number][]> {
   try {
-    const res = await fetch(cctvCsvUrl);
-    if (!res.ok) {
-      console.warn('Could not load cctv-locations.csv:', res.status);
+    const { data, error } = await supabase
+      .from("cctv_locations")
+      .select("geo_coordinates")
+      .not("geo_coordinates", "is", null);
+
+    if (error) {
+      console.warn("Could not load cctv_locations:", error.message);
       return [];
     }
-    const text = await res.text();
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    const points: [number, number][] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const point = parseGeoPointFromLine(lines[i]);
-      if (point) points.push(point);
-    }
-    return points;
+
+    const rows = (data ?? []) as CctvRow[];
+    return rows
+      .map((row) => parseGeoCoordinates(row.geo_coordinates))
+      .filter((point): point is [number, number] => point !== null);
   } catch (e) {
-    console.warn('Could not load cctv-locations.csv', e);
+    console.warn("Could not load cctv_locations", e);
     return [];
   }
 }

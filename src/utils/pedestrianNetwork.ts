@@ -1,59 +1,104 @@
-/**
- * Load pedestrian network segments from data/pedestrian-network.csv.
- * Geo Shape column contains GeoJSON LineString: coordinates are [lng, lat][].
- * Returns array of segments as Leaflet positions [lat, lng][].
- */
-import pedestrianNetworkCsvUrl from '../../data/pedestrian-network.csv?url';
+import { supabase } from "../lib/supabase";
 
-/** One segment of the pedestrian network: array of [lat, lng] for Polyline */
 export type PedestrianSegment = [number, number][];
+export type PedestrianPoint = [number, number];
+export type PedestrianNetworkData = {
+  segments: PedestrianSegment[];
+  points: PedestrianPoint[];
+};
 
-function parseLineToSegment(line: string): PedestrianSegment | null {
-  const coordStart = line.indexOf('[[', line.indexOf('coordinates'));
-  if (coordStart === -1) return null;
-  const coordEnd = line.indexOf(']]', coordStart) + 2;
-  const arrStr = line.slice(coordStart, coordEnd);
-  let coords: [number, number][];
-  try {
-    coords = JSON.parse(arrStr) as [number, number][];
-  } catch {
-    return null;
+type PedestrianRow = {
+  type?: unknown;
+  geo_bounds: unknown;
+  geo_coordinates?: unknown;
+};
+
+function parseCoordPair(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const a = Number(value[0]);
+  const b = Number(value[1]);
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return [a, b];
+}
+
+function toLatLng(pair: [number, number]): [number, number] {
+  const [a, b] = pair;
+  // Most geo arrays here are [lng, lat], but fallback for [lat, lng].
+  if (Math.abs(a) > 90 && Math.abs(b) <= 90) return [b, a];
+  return [a, b];
+}
+
+function extractSegments(node: unknown): PedestrianSegment[] {
+  if (!Array.isArray(node) || node.length === 0) return [];
+
+  const pairs = node.map(parseCoordPair);
+  if (pairs.every((pair) => pair !== null)) {
+    const segment = pairs.map((pair) => toLatLng(pair as [number, number]));
+    return segment.length >= 2 ? [segment] : [];
   }
-  if (!Array.isArray(coords) || coords.length < 2) return null;
-  // GeoJSON is [lng, lat]; Leaflet wants [lat, lng]
-  return coords.map(([lng, lat]) => [lat, lng]);
+
+  return node.flatMap((child) => extractSegments(child));
 }
 
 /**
- * Fetch and parse pedestrian-network.csv, return line segments for the map.
- * Samples to maxSegments when the file is large (default 3000).
+ * Fetch and parse pedestrian network segments from Supabase.
  */
 export async function loadPedestrianNetwork(
-  maxSegments: number = 3000
-): Promise<PedestrianSegment[]> {
+  maxSegments: number = 3000,
+): Promise<PedestrianNetworkData> {
   try {
-    const res = await fetch(pedestrianNetworkCsvUrl);
-    if (!res.ok) {
-      console.warn('Could not load pedestrian-network.csv:', res.status);
-      return [];
+    const { data, error } = await supabase
+      .from("pedestrian_network")
+      .select("type, geo_bounds, geo_coordinates");
+
+    if (error) {
+      console.warn("Could not load pedestrian_network:", error.message);
+      return { segments: [], points: [] };
     }
-    const text = await res.text();
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    const segments: PedestrianSegment[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const segment = parseLineToSegment(lines[i]);
-      if (segment) segments.push(segment);
+
+    const rows = (data ?? []) as PedestrianRow[];
+    const points: PedestrianPoint[] = [];
+    const allSegments: PedestrianSegment[] = [];
+
+    for (const row of rows) {
+      const rowType = String(row.type ?? "").toLowerCase();
+
+      if (rowType === "point") {
+        const pair = parseCoordPair(row.geo_coordinates);
+        if (pair) {
+          points.push(toLatLng(pair));
+        }
+        continue;
+      }
+
+      if (rowType === "linestring") {
+        allSegments.push(...extractSegments(row.geo_bounds));
+        continue;
+      }
+
+      // Fallback for rows without a trusted type.
+      if (row.geo_bounds != null) {
+        allSegments.push(...extractSegments(row.geo_bounds));
+      }
+      if (row.geo_coordinates != null) {
+        const pair = parseCoordPair(row.geo_coordinates);
+        if (pair) {
+          points.push(toLatLng(pair));
+        }
+      }
     }
-    if (segments.length <= maxSegments) return segments;
+
+    const segments = allSegments;
+    if (segments.length <= maxSegments) return { segments, points };
     const step = segments.length / maxSegments;
     const sampled: PedestrianSegment[] = [];
     for (let i = 0; i < maxSegments; i++) {
       const idx = Math.min(Math.floor(i * step), segments.length - 1);
       sampled.push(segments[idx]);
     }
-    return sampled;
+    return { segments: sampled, points };
   } catch (e) {
-    console.warn('Could not load pedestrian-network.csv', e);
-    return [];
+    console.warn("Could not load pedestrian_network", e);
+    return { segments: [], points: [] };
   }
 }
