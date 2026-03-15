@@ -11,6 +11,7 @@ export type PoliceStation = {
 
 type PoliceStationRow = {
   geo_coordinates: unknown;
+  name?: unknown;
 };
 
 function parseStation(row: PoliceStationRow): PoliceStation | null {
@@ -20,7 +21,11 @@ function parseStation(row: PoliceStationRow): PoliceStation | null {
   const lat = Number(row.geo_coordinates[0]);
   const lng = Number(row.geo_coordinates[1]);
   if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
-  return { position: [lat, lng], name: "Police Station" };
+  const name =
+    typeof row.name === "string" && row.name.trim().length > 0
+      ? row.name.trim()
+      : "Police Station";
+  return { position: [lat, lng], name };
 }
 
 /**
@@ -33,7 +38,7 @@ export async function loadPoliceStations(): Promise<PoliceStation[]> {
       async () => {
         const rows = await fetchAllRows<PoliceStationRow>(
           "police_stations",
-          "geo_coordinates",
+          "geo_coordinates, name",
         );
         return rows
           .map(parseStation)

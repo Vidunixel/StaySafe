@@ -35,12 +35,27 @@ import { useCrimeStats } from "../../hooks/useCrimeStats";
 import { loadStreetLights } from "../../utils/streetLights";
 import { loadPoliceStations } from "../../utils/policeStations";
 import { loadPedestrianNetwork } from "../../utils/pedestrianNetwork";
+import { getDefaultCacheTtlMs, loadWithCache } from "../../lib/dataLoader";
 import type { Report } from "../App";
 import type { GeoJsonObject } from "geojson";
 import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 import { add } from "date-fns";
 
 type LatLngTuple = [number, number];
+
+function getWalkingRouteCacheKey(
+  start: { lat: number; lng: number },
+  end: { lat: number; lng: number },
+): string {
+  const round = (value: number) => value.toFixed(5);
+  return [
+    "route.walking",
+    round(start.lat),
+    round(start.lng),
+    round(end.lat),
+    round(end.lng),
+  ].join(":");
+}
 
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -496,31 +511,38 @@ export default function MapView({
     start: { lat: number; lng: number },
     end: { lat: number; lng: number },
   ): Promise<LatLngTuple[]> {
-    const routeUrl =
-      `https://router.project-osrm.org/route/v1/foot/` +
-      `${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+    const routeCacheKey = getWalkingRouteCacheKey(start, end);
+    return loadWithCache(
+      routeCacheKey,
+      async () => {
+        const routeUrl =
+          `https://router.project-osrm.org/route/v1/foot/` +
+          `${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
 
-    const response = await fetch(routeUrl);
-    if (!response.ok) {
-      return [
-        [start.lat, start.lng],
-        [end.lat, end.lng],
-      ];
-    }
+        const response = await fetch(routeUrl);
+        if (!response.ok) {
+          return [
+            [start.lat, start.lng],
+            [end.lat, end.lng],
+          ];
+        }
 
-    const payload = (await response.json()) as {
-      routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
-    };
+        const payload = (await response.json()) as {
+          routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+        };
 
-    const coordinates = payload.routes?.[0]?.geometry?.coordinates;
-    if (!coordinates || coordinates.length < 2) {
-      return [
-        [start.lat, start.lng],
-        [end.lat, end.lng],
-      ];
-    }
+        const coordinates = payload.routes?.[0]?.geometry?.coordinates;
+        if (!coordinates || coordinates.length < 2) {
+          return [
+            [start.lat, start.lng],
+            [end.lat, end.lng],
+          ];
+        }
 
-    return coordinates.map(([lng, lat]) => [lat, lng] as LatLngTuple);
+        return coordinates.map(([lng, lat]) => [lat, lng] as LatLngTuple);
+      },
+      getDefaultCacheTtlMs(),
+    );
   }
   
   useEffect(() => {
