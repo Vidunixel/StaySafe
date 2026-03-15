@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import MapView from "./components/MapView";
 import Sidebar from "./components/layout/Sidebar";
 import ReportModal from "./components/ReportModal";
@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import { fetchAllRows } from "../lib/dataLoader";
 import { Button } from "./components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Map as LeafletMap } from 'leaflet';
 
 export type Report = {
   id: string;
@@ -43,6 +44,17 @@ export default function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const mapRef = useRef<LeafletMap | null>(null);
+
+  const zoomToLocation = (lat: number, lng: number) => {
+    if (!mapRef.current) {
+      console.log("mapRef is null");
+      return;
+    }
+    console.log("Zooming map to:", lat, lng);
+    mapRef.current.flyTo([lat, lng], 15, { duration: 0.8 });
+  };
 
   const fetchReports = async () => {
     setReportsLoading(true);
@@ -148,6 +160,7 @@ export default function App() {
           showPedestrianNetwork={showPedestrianNetwork}
           setShowPedestrianNetwork={setShowPedestrianNetwork}
           reports={reports}
+          onReportClick={zoomToLocation}
         />
       </div>
 
