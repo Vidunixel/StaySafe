@@ -163,7 +163,13 @@ export default function MapView({
     );
   }, []);
 
+  const zoomToLocation = (lat: number, lng: number) => {
+    if (!mapRef.current) return;
 
+    mapRef.current.flyTo([lat, lng], 15, {
+      duration: 0.8,
+    });
+  };
 
   const [cctvPoints, setCctvPoints] = useState<[number, number][]>([]);
   useEffect(() => {
@@ -202,6 +208,18 @@ export default function MapView({
   const [showReportToast, setShowReportToast] = useState(false);
   const previousDraftLocationRef = useRef<{ lat: number; lng: number } | null>(null);
   const reportToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // When the map container resizes (e.g. sidebar toggle), tell Leaflet to recalculate
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      mapRef.current?.invalidateSize();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const heatmapVisible = showHeatmap && !showNavigation && !reportModeActive;
 
   function distanceMeters(pointA: LatLngTuple, pointB: LatLngTuple) {
@@ -617,7 +635,15 @@ export default function MapView({
 
         {showCCTV &&
           cctvPoints.map((point, idx) => (
-            <Marker key={`cctv-${idx}`} position={point} icon={cctvIcon}>
+            <Marker 
+            key={`cctv-${idx}`} 
+            position={point} 
+            icon={cctvIcon}
+            eventHandlers={{
+              click: () => {
+                zoomToLocation(point[0], point[1]);
+              },
+            }}>
               <Popup>
                 <div className="font-sans text-xs">
                   <span className="font-semibold text-blue-700 block mb-1">
@@ -631,7 +657,15 @@ export default function MapView({
 
         {showLighting &&
           lightingPoints.map((point, idx) => (
-            <Marker key={`light-${idx}`} position={point} icon={lightingIcon}>
+            <Marker key={`light-${idx}`} 
+            position={point} 
+            icon={lightingIcon}        
+            eventHandlers={{
+              click: () => {
+                zoomToLocation(point[0], point[1]);
+              },
+            }}
+            >
               <Popup>
                 <div className="font-sans text-xs">
                   <span className="font-semibold text-amber-600 block mb-1">
@@ -650,7 +684,16 @@ export default function MapView({
             if (!coordinates) return null;
 
             return (
-              <Marker key={report.id} position={coordinates} icon={reportIcon}>
+              <Marker 
+                key={report.id}          
+                position={coordinates} 
+                icon={reportIcon}
+                eventHandlers={{
+                  click: () => {
+                    zoomToLocation(coordinates[0], coordinates[1]);
+                  },
+                }}
+                >
                 <Popup>
                   <div className="font-sans min-w-[200px]">
                     <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100">
@@ -676,7 +719,12 @@ export default function MapView({
             <Marker
               key={`police-${idx}`}
               position={station.position}
-              icon={policeStationIcon}
+              icon={policeStationIcon}      
+              eventHandlers={{
+                click: () => {
+                  zoomToLocation(station.position[0], station.position[1]);
+                },
+              }}
             >
               <Popup>
                 <div className="font-sans text-xs">
