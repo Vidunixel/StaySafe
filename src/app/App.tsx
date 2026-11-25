@@ -3,7 +3,7 @@ import MapView from "./components/MapView";
 import Sidebar from "./components/layout/Sidebar";
 import ReportModal from "./components/ReportModal";
 import { useMapState, type ReportFormValues } from "../hooks/useMapState";
-import { supabase } from "../lib/supabase";
+import { createReport } from "../lib/api";
 import { fetchAllRows } from "../lib/dataLoader";
 import { Button } from "./components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
@@ -105,18 +105,19 @@ export default function App() {
   const submitReport = async (data: ReportFormValues) => {
     if (!reportingLocation) return;
 
-    const newReport = {
-      geo_coordinates: [reportingLocation.lat, reportingLocation.lng],
-      incident_type: data.incidentType,
-      description: data.description,
-    };
-
-    const { error } = await supabase.from("reports").insert(newReport);
-
-    if (!error) {
-      await fetchReports();
-      setReportingLocation(null);
+    try {
+      await createReport({
+        geo_coordinates: [reportingLocation.lat, reportingLocation.lng],
+        incident_type: data.incidentType,
+        description: data.description,
+      });
+    } catch (error) {
+      console.warn("Could not save report", error);
+      return;
     }
+
+    await fetchReports();
+    setReportingLocation(null);
   };
 
   return (

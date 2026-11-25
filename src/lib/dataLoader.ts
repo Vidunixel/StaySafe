@@ -1,7 +1,6 @@
-import { supabase } from "./supabase";
+import { fetchTable } from "./api";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PAGE_SIZE = 1000;
 const CACHE_PREFIX = "staysafe.cache.v1";
 
 type CacheEnvelope<T> = {
@@ -60,31 +59,11 @@ export async function loadWithCache<T>(
   return fresh;
 }
 
+// `columns` is only documentation now: the local server returns whole rows,
+// which are the columns the old Supabase select() asked for.
 export async function fetchAllRows<T>(
   table: string,
-  columns: string,
-  pageSize: number = PAGE_SIZE,
+  _columns?: string,
 ): Promise<T[]> {
-  const allRows: T[] = [];
-  let from = 0;
-
-  while (true) {
-    const to = from + pageSize - 1;
-    const { data, error } = await supabase
-      .from(table)
-      .select(columns)
-      .range(from, to);
-
-    if (error) {
-      throw error;
-    }
-
-    const batch = (data ?? []) as T[];
-    allRows.push(...batch);
-
-    if (batch.length < pageSize) break;
-    from += pageSize;
-  }
-
-  return allRows;
+  return fetchTable<T>(table);
 }
