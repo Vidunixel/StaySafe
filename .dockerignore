@@ -1,0 +1,13 @@
+.git
+node_modules
+dist
+server/datasets
+var
+tiles
+# Inputs to the R analysis, not needed to build the app
+R files
+data/crime_stats/*.xlsx
+data/street_lights/ballarat_lighting.csv
+data/street_lights/cityOfCasey_lighting.csv
+data/street_lights/melbourne_yarra_lighting.csv
+osm

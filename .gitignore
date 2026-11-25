@@ -57,3 +57,9 @@ supabase/.config
 firebase-debug.log
 functions/.runtimeconfig.json
 
+
+# Self-hosted server: built datasets and the reports database
+server/datasets/
+var/
+tiles/
+osm/

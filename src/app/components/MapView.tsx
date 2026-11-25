@@ -1,7 +1,6 @@
 import React, { useEffect,useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Marker,
   CircleMarker,
   Popup,
@@ -42,8 +41,40 @@ import type { GeoJsonObject } from "geojson";
 import { geoBoundsToLatLngs } from "../../utils/geoBounds";
 import { add } from "date-fns";
 import { Map as LeafletMap } from 'leaflet';
+import markerIcon2xUrl from "leaflet/dist/images/marker-icon-2x.png";
+import markerIconUrl from "leaflet/dist/images/marker-icon.png";
+import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
+import { leafletLayer } from "protomaps-leaflet";
 
 type LatLngTuple = [number, number];
+
+// Basemap: one Protomaps vector-tile file for Victoria, served by the local
+// server from its tiles/ folder (see OFFLINE.md for how to make it).
+const BASEMAP_URL = "/tiles/victoria.pmtiles";
+
+// Appended to place searches. The local geocoder only holds Victoria, and the
+// old ", Melbourne" scope sent "Geelong" or "Ballarat" to Melbourne streets.
+const SEARCH_SCOPE = "Victoria, Australia";
+
+function OfflineBasemap() {
+  const map = useMap();
+
+  useEffect(() => {
+    const layer = leafletLayer({
+      url: BASEMAP_URL,
+      flavor: "light",
+      lang: "en",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://protomaps.com">Protomaps</a>',
+    }) as unknown as L.Layer;
+    layer.addTo(map);
+    return () => {
+      map.removeLayer(layer);
+    };
+  }, [map]);
+
+  return null;
+}
 
 function getWalkingRouteCacheKey(
   start: { lat: number; lng: number },
@@ -62,12 +93,9 @@ function getWalkingRouteCacheKey(
 // Fix default icon path issues with standard leaflet markers (often needed in bundlers)
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconRetinaUrl: markerIcon2xUrl,
+  iconUrl: markerIconUrl,
+  shadowUrl: markerShadowUrl,
 });
 
 function MapEventHandler({
@@ -466,8 +494,8 @@ export default function MapView({
   async function geocodePlace(
     query: string,
   ): Promise<{ lat: number; lng: number } | null> {
-    const scopedQuery = `${query}, Melbourne, Victoria, Australia`;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(scopedQuery)}`;
+    const scopedQuery = `${query}, ${SEARCH_SCOPE}`;
+    const url = `/api/geocode?limit=1&q=${encodeURIComponent(scopedQuery)}`;
 
     const response = await fetch(url, {
       headers: {
@@ -496,13 +524,12 @@ export default function MapView({
   ): Promise<Array<{ display_name: string; lat: number; lng: number }>> {
     const trimmed = query.trim();
     if (!trimmed) return [];
-    const scopedQuery = `${trimmed}, Melbourne, Victoria, Australia`;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(scopedQuery)}`;
+    const scopedQuery = `${trimmed}, ${SEARCH_SCOPE}`;
+    const url = `/api/geocode?limit=5&q=${encodeURIComponent(scopedQuery)}`;
 
     const response = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "User-Agent": "StaySafe-Victoria-Crime-Prediction/1.0",
       },
     });
 
@@ -541,15 +568,14 @@ export default function MapView({
       routeCacheKey,
       async () => {
         const routeUrl =
-          `https://router.project-osrm.org/route/v1/foot/` +
-          `${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+          `/api/route?coords=` +
+          encodeURIComponent(`${start.lng},${start.lat};${end.lng},${end.lat}`);
 
+        // Throw instead of returning a straight line, so the fallback isn't
+        // cached for a day; the caller draws the straight line itself.
         const response = await fetch(routeUrl);
         if (!response.ok) {
-          return [
-            [start.lat, start.lng],
-            [end.lat, end.lng],
-          ];
+          throw new Error(`Routing unavailable (${response.status})`);
         }
 
         const payload = (await response.json()) as {
@@ -558,10 +584,7 @@ export default function MapView({
 
         const coordinates = payload.routes?.[0]?.geometry?.coordinates;
         if (!coordinates || coordinates.length < 2) {
-          return [
-            [start.lat, start.lng],
-            [end.lat, end.lng],
-          ];
+          throw new Error("No walking route found");
         }
 
         return coordinates.map(([lng, lat]) => [lat, lng] as LatLngTuple);
@@ -827,10 +850,7 @@ export default function MapView({
         <ZoomControl position="bottomright" />
         <MapRefHandler mapRef={mapRef} />
 
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+        <OfflineBasemap />
 
         {userLocation && (
           <>

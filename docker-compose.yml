@@ -1,0 +1,46 @@
+services:
+  staysafe:
+    build: .
+    image: staysafe:local
+    container_name: staysafe
+    restart: unless-stopped
+    ports:
+      - "8100:8080"
+    environment:
+      GEOCODER_URL: http://nominatim:8080
+      OSRM_URL: http://osrm:5000
+    volumes:
+      - ./var:/app/var          # reports database (staysafe.sqlite)
+      - ./tiles:/app/tiles:ro   # victoria.pmtiles basemap
+
+  # Walking routes. Data built by scripts/prepare-osm.sh
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v26.4.0
+    container_name: staysafe-osrm
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld /data/victoria.osrm
+    volumes:
+      - ./osm:/data:ro
+
+  # Place search. Imports osm/victoria.osm.pbf on its first start (hours),
+  # then serves the Nominatim API. Tuned down for the box's 7.7 GB of RAM.
+  nominatim:
+    image: mediagis/nominatim:5.3.2
+    container_name: staysafe-nominatim
+    restart: unless-stopped
+    shm_size: 1g
+    environment:
+      PBF_PATH: /osm/victoria.osm.pbf
+      FREEZE: "true"            # no live updates; refresh = re-import
+      THREADS: "3"
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 1GB
+      POSTGRES_AUTOVACUUM_WORK_MEM: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 2GB
+    volumes:
+      # Just the .pbf, not /nominatim/data: the image chowns that folder on start
+      - ./osm/victoria.osm.pbf:/osm/victoria.osm.pbf:ro
+      - nominatim-db:/var/lib/postgresql/16/main
+
+volumes:
+  nominatim-db:
